@@ -16,7 +16,7 @@ HOOKS_JSON='{
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Pre-Push Chronicle Gate Review:\\n\\n1. Chronicle-worthy? (new capability, decision, insight, pattern, Go/GraphQL lessons?)\\n   → If yes: Create diary entry in diary/\\n\\n2. Archive-worthy? (research findings, design decisions, Linear API integration patterns?)\\n   → If yes: Document appropriately\\n\\nDo NOT proceed until you have reviewed ALL session work for worthy items.\\nSee AGENTS.md 'Pre-Push Chronicle Gate' for the full checklist.\\n\""
+            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Pre-Push Chronicle Gate Review:\\n\\n1. Chronicle-worthy? (new capability, decision, insight, pattern, Go/GraphQL lessons?)\\n   → If yes: Create diary entry in diary/\\n\\n2. Archive-worthy? (research findings, design decisions, Linear API integration patterns?)\\n   → If yes: Document appropriately\\n\\nDo NOT proceed until you have reviewed ALL session work for worthy items.\\nSee AGENTS.md Pre-Push Chronicle Gate section for the full checklist.\\n\""
           }
         ]
       }
