@@ -1,0 +1,18 @@
+# lirt runtime configuration (town-specific)
+.lirt/
+
+# Beads runtime files
+.beads/beads.db*
+.beads/daemon.*
+.beads/sync_base.jsonl
+.beads/last-touched
+.beads/.sync.lock
+.beads/.local_version
+
+# OS and editor files
+.DS_Store
+*~
+*.swp
+*.swo
+.vscode/
+.idea/

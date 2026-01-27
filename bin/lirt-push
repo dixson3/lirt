@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# lirt-push - Push with chronicle check
+#
+# Ensures chronicle-worthy work is captured before pushing.
+# Use instead of raw 'git push' in lirt workspaces.
+
+set -euo pipefail
+
+# Find lirt root (look for diary/)
+find_lirt_root() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/diary" && -f "$dir/AGENTS.md" ]]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+LIRT_ROOT=$(find_lirt_root) || {
+    echo "Error: Not in a lirt workspace (no diary/ found)"
+    exit 1
+}
+
+# Check for recent diary entries (last 2 hours)
+recent_diary() {
+    find "$LIRT_ROOT/diary" -name "*.md" -not -name "_index.md" -mmin -120 2>/dev/null | head -1
+}
+
+# Check for uncommitted diary changes
+uncommitted_diary() {
+    git -C "$LIRT_ROOT" status --porcelain diary/ 2>/dev/null | grep -q .
+}
+
+echo "🔍 Pre-Push Chronicle Gate..."
+
+if recent_diary >/dev/null || uncommitted_diary; then
+    echo "✓ Recent diary activity detected"
+else
+    echo ""
+    echo "⚠️  No recent diary entries found."
+    echo ""
+    echo "Review ALL commits being pushed:"
+    echo "  • New capability, crew member, or infrastructure added?"
+    echo "  • Decision made with reasoning worth preserving?"
+    echo "  • Insight about Go CLI development or Linear API integration?"
+    echo "  • Pattern or lesson learned?"
+    echo "  • GraphQL client design decision?"
+    echo ""
+    read -p "Chronicle-worthy work in this push? [y/N/skip]: " -r response
+
+    case "${response,,}" in
+        y|yes)
+            echo ""
+            echo "Please create a diary entry first:"
+            echo "  File: diary/$(date '+%y-%m-%d.%H-%M-%Z').<town>.<topic>.md"
+            echo "  Town: $(cd "$LIRT_ROOT" && bin/lirt-town-id get 2>/dev/null || echo 'unknown')"
+            echo ""
+            echo "Then run 'lirt-push' again."
+            exit 1
+            ;;
+        skip|s)
+            echo "⚠️  Skipping chronicle gate (not recommended)"
+            ;;
+        *)
+            echo "✓ No chronicle-worthy work - proceeding"
+            ;;
+    esac
+fi
+
+echo ""
+echo "📤 Pushing..."
+exec git push "$@"
