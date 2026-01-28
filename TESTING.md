@@ -1,5 +1,19 @@
 # Testing Guide for lirt
 
+## Quick Start
+
+```bash
+# Run all tests (skips API tests if LINEAR_TEST_API_KEY not set)
+make test
+
+# Set up test environment for API tests
+cp /Users/james/gt/lirt/.env.test.example /Users/james/gt/lirt/.env.test
+vim /Users/james/gt/lirt/.env.test  # Add your LINEAR_TEST_API_KEY
+
+# Run API tests
+make test-api
+```
+
 ## Running Tests
 
 ### Run all tests
@@ -38,26 +52,110 @@ go tool cover -html=coverage.out
 go test -cover ./...
 ```
 
-## API Tests
+## Test Environment Setup
 
-Some tests require access to the Linear API and will be skipped unless you provide a test API key.
+Tests that interact with the Linear API require credentials. You have multiple options for providing them:
 
-### Setting up API test credentials
+### Option 1: Using .env.test Files (Recommended)
 
-**Option 1: Environment variable (recommended for CI)**
+This is the recommended approach as it works across all worktrees and integrates with direnv.
+
+**Location of .env.test files**:
+- **Git root** (shared): `/Users/james/gt/lirt/.env.test`
+  - Shared across all worktrees (refinery, witness, polecats)
+  - Automatically loaded by all tests
+- **Worktree-specific** (optional): `[worktree]/.env.test.local`
+  - Overrides git root settings for a specific worktree
+  - Useful if you need different credentials per worktree
+
+**Setup steps**:
+
+1. **Copy the template to git root**:
+   ```bash
+   cd /Users/james/gt/lirt
+   cp .env.test.example .env.test
+   ```
+
+2. **Edit and add your test API key**:
+   ```bash
+   vim .env.test  # or your preferred editor
+   # Set: LINEAR_TEST_API_KEY="lin_api_your_test_key_here"
+   ```
+
+3. **Run tests from any worktree**:
+   ```bash
+   cd refinery/rig
+   make test-api
+
+   # Or from any worktree:
+   cd witness
+   go test ./...
+   ```
+
+**The .env.test file is automatically loaded** by the test suite via `internal/testutil/env.go`.
+
+**Worktree-specific overrides** (optional):
 ```bash
-export LINEAR_TEST_API_KEY="your_test_api_key_here"
+cd refinery/rig
+cat > .env.test.local <<EOF
+LINEAR_TEST_API_KEY="different_key_for_this_worktree"
+LINEAR_TEST_TIMEOUT="60"
+EOF
+make test-api  # Uses worktree-specific settings
+```
+
+**File precedence** (later overrides earlier):
+1. `/Users/james/gt/lirt/.env.test` (git root, lowest priority)
+2. `[worktree]/.env.test` (worktree-level)
+3. `[worktree]/.env.test.local` (worktree-specific, highest priority)
+
+### Option 2: Using direnv
+
+If you use [direnv](https://direnv.net/), create an `.envrc` at the git root:
+
+```bash
+cd /Users/james/gt/lirt
+cat > .envrc <<EOF
+# Load test environment
+dotenv_if_exists .env.test
+dotenv_if_exists .env.test.local
+EOF
+direnv allow
+```
+
+Now environment variables are automatically loaded when you `cd` into the project:
+```bash
+cd /Users/james/gt/lirt/refinery/rig
+echo $LINEAR_TEST_API_KEY  # Automatically set by direnv
+make test-api
+```
+
+### Option 3: Environment Variables (CI/CD)
+
+For CI/CD pipelines or one-off testing:
+
+```bash
+export LINEAR_TEST_API_KEY="lin_api_your_test_key_here"
+cd refinery/rig
+make test-api
+```
+
+### Option 4: Using lirt Auth Profile
+
+If you've already authenticated with lirt:
+
+```bash
+# Login with a test account
+./bin/lirt auth login --profile test
+
+# Extract API key for tests
+export LINEAR_TEST_API_KEY=$(./bin/lirt auth token --profile test)
 go test ./internal/client -v
 ```
 
-**Option 2: Create a test profile**
-```bash
-# Login with a test account (creates test workspace credentials)
-./bin/lirt auth login --profile test
+## API Tests
 
-# Run tests using that profile
-LINEAR_TEST_API_KEY=$(./bin/lirt auth token --profile test) go test ./internal/client -v
-```
+Some tests require access to the Linear API and will be skipped unless you provide a test API key.
 
 ### Tests that require API access
 

@@ -4,7 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dixson3/lirt/internal/testutil"
 )
+
+func init() {
+	// Load .env.test files if present (from git root or current directory)
+	testutil.MustLoadTestEnv()
+}
 
 // TestCredentialsFilePermissions verifies that credentials files are created
 // with secure 0600 permissions (owner read/write only).

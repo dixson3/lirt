@@ -5,6 +5,7 @@ go 1.25.6
 require (
 	github.com/fatih/color v1.18.0
 	github.com/hasura/go-graphql-client v0.15.1
+	github.com/joho/godotenv v1.5.1
 	github.com/olekukonko/tablewriter v1.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0

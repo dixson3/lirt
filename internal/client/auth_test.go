@@ -6,7 +6,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dixson3/lirt/internal/testutil"
 )
+
+func init() {
+	// Load .env.test files if present (from git root or current directory)
+	testutil.MustLoadTestEnv()
+}
 
 // TestAuthWithInvalidAPIKey verifies that authentication with an invalid
 // API key returns a clear error message.
