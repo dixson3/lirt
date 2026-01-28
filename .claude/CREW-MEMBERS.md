@@ -123,33 +123,39 @@ Specialized in reviewing:
 
 ### 5. lirt-chronicler
 **File:** `.claude/agents/lirt-chronicler.md`
-**Role:** Development Historian
-**Expertise:** Diary Entry Creation, Insight Documentation
+**Role:** Diary Entry Processor
+**Expertise:** Processing Chronicle Beads, Diary Entry Creation
 
-The diary writer for lirt development insights:
-- Creates formatted diary entries following the chronicler protocol
-- Documents decisions, insights, patterns, corrections, and lessons
-- Maintains diary index
-- Ensures consistent entry format and style
+Processes chronicle beads into diary entries:
+- Reads all open chronicle beads from queue
+- Groups related beads when appropriate (4-hour window, shared themes)
+- Creates formatted diary entries from bead descriptions
+- Updates diary index
+- Closes processed beads
 
 **When to Use:**
-- When any agent identifies something chronicle-worthy
-- After making a significant decision (invoked by the deciding agent)
-- After discovering an insight (invoked by the discovering agent)
-- After recognizing a pattern (invoked by the recognizing agent)
+- Before every push (Pre-Push Chronicle Gate)
+- When ending a work session (Landing the Plane)
+- Periodically to keep chronicle queue clean
 
 **Invocation Pattern:**
-Other agents invoke with context:
-```
-Ask lirt-chronicler to document [rich context about what's worth chronicling]
+```bash
+# Run agent to process all open chronicle beads
+lirt-chronicler
 ```
 
 **Key Responsibilities:**
-- Extract core insight from provided context
-- Create well-formatted diary entry
+- Query open chronicle beads: `bd ready --type chronicle`
+- Analyze beads for intelligent grouping
+- Extract rich context from 300-600 word bead descriptions
+- Create well-formatted diary entries
 - Update diary/_index.md
-- Follow template religiously
-- Maintain consistent voice and style
+- Close processed beads: `bd close <id1> <id2> ...`
+
+**Grouping Logic:**
+- Group IF: 4-hour window, shared themes, coherent narrative
+- Don't group IF: Different topics, temporal ordering matters
+- Default to separate entries when unclear
 
 ## Agent Coordination
 
@@ -175,7 +181,7 @@ Ask lirt-chronicler to document [rich context about what's worth chronicling]
 │  Code Review     │  lirt-code-reviewer validates quality
 └──────────────────┘
 
-Cross-cutting: lirt-chronicler documents insights from any agent
+Cross-cutting: Any agent creates chronicle beads → lirt-chronicler processes them
 ```
 
 ### Example Usage

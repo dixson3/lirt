@@ -34,7 +34,9 @@ roles/<name>.md
 
 | Crew Member | Role File | Purpose |
 |-------------|-----------|---------|
-| chronicler | `roles/chronicler.md` | Captures insights and decision reasoning in lirt development |
+| chronicler | `roles/chronicler.md` | Detection protocol for chronicle-worthy moments; execution agent processes beads |
+| test-case-identifier | `roles/test-case-identifier.md` | Detection protocol for testable scenarios across all agents |
+| code-quality-reporter | `roles/code-quality-reporter.md` | Detection protocol for code quality issues (primarily lirt-code-reviewer) |
 
 ### Adding New Crew Members
 
@@ -45,27 +47,142 @@ When adding a new crew member:
 
 ---
 
-## Chronicler Protocol
+## Chronicle Protocol (Beads-Mediated)
 
-The **Chronicler** captures insights in the evolution of James's thinking during lirt development. This is not a changelog—it's a record of *how* work is performed and *why* decisions are made.
+The **Chronicle Protocol** captures insights in the evolution of James's thinking during lirt development. This is not a changelog—it's a record of *how* work is performed and *why* decisions are made.
+
+**Protocol Pattern:** Detection (ALL agents) → Beads Queue → Execution (lirt-chronicler)
 
 ### Chronicle-Worthy Triggers
 
-**ALL agents working on lirt** must watch for these patterns:
+**ALL agents working on lirt** must watch for these patterns and create chronicle beads IMMEDIATELY:
 
 | Trigger | Example |
 |---------|---------|
-| **Significant decision** | Choosing an approach for GraphQL client design, rejecting an alternative |
-| **Insight emerges** | Realizing a Go pattern that simplifies implementation |
-| **Pattern recognized** | Noticing recurring themes in CLI UX or Linear API integration |
-| **Course correction** | Changing API design based on performance measurements |
-| **Lesson learned** | What worked or didn't in Go testing, and why |
+| **Decision** | Choosing functional options over builder pattern for Go client config |
+| **Insight** | Realizing cursor pagination prevents data loss vs offset pagination |
+| **Pattern** | Recognizing table-driven tests as recurring pattern across CLI tests |
+| **Correction** | Pivoting GraphQL client design after performance testing |
+| **Lesson** | What worked or didn't in Go testing strategies |
 
-### What NOT to Chronicle
+### Creating Chronicle Beads
 
-- Routine task completion (that's for beads)
-- Technical implementation details (that's for code/docs)
-- Every conversation—only the meaningful ones
+When you identify something chronicle-worthy, create a chronicle bead **IMMEDIATELY** (while context is fresh):
+
+```bash
+bd create --title "Chronicle: [specific topic]" \
+  --type chronicle \
+  --priority 3 \
+  --add-label [category] \
+  --add-label [topic] \
+  --description "[Rich 300-600 word description]"
+```
+
+**Category Labels:**
+- `decision` - Architectural or design decision
+- `insight` - Realization that changed understanding
+- `pattern` - Recurring theme recognized
+- `correction` - Direction change
+- `lesson` - What worked/didn't work
+
+**Topic Labels:**
+- `go-idioms` - Go language patterns
+- `graphql` - GraphQL/Linear API
+- `cli-ux` - CLI user experience
+- `performance` - Performance optimization
+- `testing` - Testing strategies
+- `security` - Security decisions
+
+**Priority:**
+- **P2**: Major architectural decision with far-reaching implications
+- **P3**: Standard chronicle-worthy moments (default)
+- **P4**: Minor insights, can be batched
+
+### Rich Description Template (300-600 words minimum)
+
+```
+Type: [decision|insight|pattern|correction|lesson]
+
+Context: [What were you working on when this occurred]
+
+[For decisions] Alternatives Considered:
+1. Option A: [description, pros/cons]
+2. Option B: [description, pros/cons]
+3. [Chosen] Option C: [description, why this won]
+
+[For insights] What Changed:
+[What you understood before vs what you understand now]
+
+Reasoning: [Why this choice/insight emerged]
+
+Trade-offs: [What you gained and what you lost with this approach]
+
+Implementation: [File:line references, commit SHAs, code snippets]
+
+Implications: [What this means for future work, patterns established]
+```
+
+### Example Chronicle Bead
+
+```bash
+bd create --title "Chronicle: Functional options for client configuration" \
+  --type chronicle \
+  --priority 3 \
+  --add-label decision \
+  --add-label go-idioms \
+  --description "
+Type: decision
+
+Context: Implementing Linear GraphQL client configuration system. Need a way
+to set optional parameters like cache TTL, timeout, retry policy...
+
+Alternatives Considered:
+1. Builder pattern: client.New().WithCache(ttl).Build()
+   - Pros: Familiar from Java/C++, chainable
+   - Cons: Not idiomatic Go 1.21+, mutable during construction
+
+2. Config struct: client.New(Config{Cache: ttl, Timeout: t})
+   - Pros: Simple, single function call
+   - Cons: Can't distinguish zero-value from unset
+
+3. [CHOSEN] Functional options: client.New(WithCache(ttl), WithTimeout(t))
+   - Pros: Idiomatic Go, self-documenting, extensible
+   - Cons: Slightly more complex implementation
+
+Reasoning:
+- Effective Go recommends functional options
+- Standard library uses this pattern (grpc, net/http)
+- Compile-time safety for required vs optional params
+
+Trade-offs:
+Gained: + Idiomatic Go + Better API ergonomics + Extensible
+Lost: - More complex implementation (10 functions vs 1 struct)
+
+Implementation:
+- Pattern definition: pkg/client/options.go
+- Client constructor: pkg/client/client.go:45-80
+
+Implications:
+- ALL future lirt packages should use functional options
+- Establishes consistency pattern across codebase
+"
+```
+
+### Processing Chronicle Beads
+
+The **lirt-chronicler** agent processes chronicle beads:
+
+```bash
+# Invoke agent to process all open chronicle beads
+lirt-chronicler
+```
+
+The agent will:
+1. Query: `bd ready --type chronicle`
+2. Analyze beads for grouping opportunities (4-hour window, shared themes)
+3. Create diary entries in `diary/` with proper formatting
+4. Update `diary/_index.md`
+5. Close processed beads
 
 ### Diary Structure
 
@@ -75,72 +192,208 @@ diary/
 └── {YY-MM-DD}.{HH-MM-TZ}.{town}.{topic}.md      # Individual entries
 ```
 
-**Note:** Include town ID to prevent collisions in multi-town setups. Get it with `lirt-town-id get`.
+## Test Case Identification Protocol (Beads-Mediated)
 
-### Creating a Diary Entry
+**Protocol Pattern:** Detection (ALL agents) → Beads Queue → Execution (lirt-test-engineer)
 
-When you identify something chronicle-worthy, **invoke the lirt-chronicler agent**:
+### When to Create Test Beads
+
+**ALL agents** must watch for testable scenarios:
+
+**During Specification Writing (lirt-spec-writer):**
+- Edge cases in command behavior
+- Error conditions in CLI usage
+- Complex flag combinations
+- Format conversions (JSON, CSV, table)
+
+**During Implementation (lirt-specialist):**
+- Edge cases discovered in code
+- Error handling paths
+- Complex business logic branches
+- Performance-critical code paths
+
+**During Code Review (lirt-code-reviewer):**
+- Untested code paths
+- Missing error handling tests
+- Security-sensitive operations without tests
+- Performance optimizations needing benchmarks
+
+### Creating Test Beads
+
+```bash
+bd create --title "Test: [specific scenario]" \
+  --type task \
+  --priority 2 \
+  --add-label requires:testing \
+  --description "[Rich 150-300 word description]"
+```
+
+**Priority:**
+- **P0**: Critical path, blocks release
+- **P1**: Important functionality, needed for stability
+- **P2**: Standard tests (default)
+- **P3**: Nice-to-have
+- **P4**: Future consideration
+
+### Test Bead Template
 
 ```
-Ask lirt-chronicler to document [context]:
+## Scenario
+[What specific scenario needs testing]
 
-[Provide rich context:]
-- What happened (decision/insight/pattern/correction/lesson)
-- The reasoning behind it
-- Key trade-offs or considerations
-- Implications for future work
+## Context
+[What were you working on when you identified this]
+
+## Test Cases Needed
+1. [Specific test case with expected behavior]
+2. [Another test case]
+3. [Edge case]
+
+## Why This Matters
+[Why this scenario is important to test]
+
+## Implementation Notes
+[Relevant code locations, patterns to use]
+
+## Acceptance Criteria
+[What makes this test complete]
 ```
 
-The lirt-chronicler agent will:
-1. Create the properly formatted diary entry
-2. Get town ID automatically (`lirt-town-id get`)
-3. Use the template from `roles/chronicler.md`
-4. Update `diary/_index.md` (newest entry first)
+### Processing Test Beads
 
-Your job is **detection**, not **execution**.
+The **lirt-test-engineer** processes test beads:
 
-### When to Chronicle
+```bash
+# Query test beads
+bd ready --label requires:testing
 
-**Primary triggers:**
-1. **Before every push** — The Pre-Push Chronicle Gate requires reviewing all commits being pushed for chronicle-worthy items. This is the most critical trigger because it catches mid-session insights that would otherwise be missed.
-2. **Completion of a coherent set of tasks** — either all tasks complete, or the Overseer decides to defer remaining work.
+# After implementing tests
+bd close <bead-id>
+```
 
-**Do NOT wait for:**
-- Context compaction (too late - context may be lost)
-- Being reminded by hooks (hooks are a safety net, not the trigger)
-- Session end (chronicle mid-session if pushing mid-session work)
+## Code Quality Reporter Protocol (Beads-Mediated)
 
-**When in doubt:** Ask the Overseer. It's better to ask than to miss capturing an insight.
+**Protocol Pattern:** Detection (lirt-code-reviewer) → Beads Queue → Execution (lirt-specialist)
 
-### Prompt Template
+**Note:** lirt-code-reviewer has read-only tools (Read, Grep, Glob) and cannot fix code directly.
 
-At task completion, ask:
-> "This seems like a chronicle-worthy session. Should I create a diary entry about [topic]?"
+### When to Create Quality Beads
+
+Watch for these categories:
+
+1. **Go Idiom Violations** (label: `idioms`)
+   - Non-idiomatic error handling
+   - Missing context propagation
+   - Incorrect interface usage
+
+2. **Performance Issues** (label: `performance`)
+   - String concatenation in loops
+   - Unnecessary allocations
+   - Hot path optimizations needed
+
+3. **Security Concerns** (label: `security`)
+   - API keys in logs or errors
+   - Insecure file permissions
+   - Missing input validation
+
+4. **Code Quality Issues** (label: `maintainability`)
+   - Complex functions
+   - Duplicated code
+   - Magic numbers without constants
+
+5. **Testing Gaps** (label: `testing`)
+   - Untested code paths
+   - Missing benchmarks
+   - Missing integration tests
+
+### Creating Quality Beads
+
+```bash
+bd create --title "[Category]: [Specific issue]" \
+  --type bug \
+  --priority [0-4] \
+  --add-label code-quality \
+  --add-label [specific-category] \
+  --description "[Rich 200-400 word description]"
+```
+
+**Priority:**
+- **P0**: Security vulnerability, data loss risk, crash
+- **P1**: Performance regression, startup time impact >10ms
+- **P2**: Go idiom violation, code smell (default)
+- **P3**: Minor improvement
+- **P4**: Nice-to-have refactoring
+
+### Quality Bead Template
+
+```
+## Issue
+[Specific code quality problem]
+
+## Location
+[File:line or files affected]
+
+## Current State
+[What the code does now / what's wrong]
+
+## Why This Matters
+[Impact on quality, performance, security, or maintainability]
+
+## Suggested Fix
+[How to address the issue with code example]
+
+## References
+[Links to Go best practices, benchmarks, or docs]
+
+## Acceptance Criteria
+[What makes this issue resolved]
+```
+
+### Processing Quality Beads
+
+The **lirt-specialist** processes quality beads:
+
+```bash
+# Query quality beads
+bd ready --type bug --label code-quality
+
+# After fixing issue
+bd close <bead-id>
+```
 
 ---
 
 ## Pre-Push Chronicle Gate
 
-**Before EVERY push** — not just at session end — you MUST review uncommitted work for chronicle-worthy items. This gate applies to every `git push` or `lirt-push` invocation.
+**Before EVERY push** — not just at session end — you MUST ensure all chronicle beads are processed. This gate applies to every `git push` or `lirt-push` invocation.
 
-### The Gate
+### The Gate (Two Checks)
 
-Before pushing, stop and ask:
+Before pushing, stop and verify:
 
-1. **Chronicle-worthy?** Review all commits being pushed:
+1. **No Open Chronicle Beads:**
+   ```bash
+   bd ready --type chronicle
+   ```
+   Must return empty. If not empty:
+   - Process beads with `lirt-chronicler` (creates diary entries, closes beads)
+   - OR defer non-critical beads to P4 if time-constrained
+
+2. **Review Recent Work for New Chronicle-Worthy Items:**
+   Review all commits being pushed:
    - New capability, crew member, or infrastructure added?
    - Significant decision with reasoning worth preserving?
    - Insight about Go CLI development or Linear API integration?
    - Pattern or lesson learned?
    - GraphQL client design decision?
 
-   If yes → Create diary entry in `diary/` before pushing
+   If yes → Create chronicle bead IMMEDIATELY (while context fresh)
 
 ### Why This Exists
 
-Chronicle items are easy to miss mid-session. You finish a task, the user says "commit and push," and the insight slips away uncommemorated. The gate prevents this: **no push without a conscious review of what's being shipped.**
+Chronicle items are easy to miss mid-session. The gate prevents this: **no push without ensuring chronicle beads are either processed or captured.**
 
-The `lirt-push` script and PreToolUse hook both enforce this gate, but the real enforcement is the habit: before every push, scan your commits and ask "is anything here worth remembering?"
+The `lirt-push` script enforces this gate by checking `bd ready --type chronicle` returns empty.
 
 ---
 
@@ -151,15 +404,32 @@ The `lirt-push` script and PreToolUse hook both enforce this gate, but the real 
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
+
 2. **Run quality gates** (if code changed) - Tests, linters, builds:
    ```bash
    go test ./...
    golangci-lint run
    go vet ./...
    ```
+
 3. **Update issue status** - Close finished work, update in-progress items
-4. **Run the Pre-Push Chronicle Gate** (see above) - Review ALL work from this session, not just the last commit
-5. **PUSH TO REMOTE** - This is MANDATORY:
+
+4. **Process Chronicle Beads** - Ensure no open chronicle beads:
+   ```bash
+   bd ready --type chronicle
+   ```
+   If not empty:
+   ```bash
+   # Process beads (creates diary entries, closes beads)
+   lirt-chronicler
+
+   # Verify empty
+   bd ready --type chronicle  # Must return empty
+   ```
+
+5. **Run the Pre-Push Chronicle Gate** (see above) - Review ALL work from this session, create new chronicle beads if needed
+
+6. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    bd sync
    git pull --rebase
@@ -170,16 +440,20 @@ The `lirt-push` script and PreToolUse hook both enforce this gate, but the real 
    lirt-push   # Use lirt-push instead of git push - enforces chronicle check
    git status  # MUST show "up to date with origin"
    ```
-6. **Clean up** - Clear stashes, prune remote branches
-7. **Verify** - All changes committed AND pushed
-8. **Hand off** - Provide context for next session
+
+7. **Clean up** - Clear stashes, prune remote branches
+
+8. **Verify** - All changes committed AND pushed
+
+9. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-- NEVER push without running the Pre-Push Chronicle Gate first
+- NEVER push without processing all open chronicle beads first
+- `bd ready --type chronicle` MUST return empty before push
 
 ---
 

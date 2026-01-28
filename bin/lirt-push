@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# lirt-push - Push with chronicle check
+# lirt-push - Push with chronicle bead check
 #
-# Ensures chronicle-worthy work is captured before pushing.
+# Ensures all chronicle beads are processed before pushing.
 # Use instead of raw 'git push' in lirt workspaces.
 
 set -euo pipefail
@@ -24,51 +24,51 @@ LIRT_ROOT=$(find_lirt_root) || {
     exit 1
 }
 
-# Check for recent diary entries (last 2 hours)
-recent_diary() {
-    find "$LIRT_ROOT/diary" -name "*.md" -not -name "_index.md" -mmin -120 2>/dev/null | head -1
-}
-
-# Check for uncommitted diary changes
-uncommitted_diary() {
-    git -C "$LIRT_ROOT" status --porcelain diary/ 2>/dev/null | grep -q .
-}
+cd "$LIRT_ROOT"
 
 echo "🔍 Pre-Push Chronicle Gate..."
 
-if recent_diary >/dev/null || uncommitted_diary; then
-    echo "✓ Recent diary activity detected"
-else
-    echo ""
-    echo "⚠️  No recent diary entries found."
-    echo ""
-    echo "Review ALL commits being pushed:"
-    echo "  • New capability, crew member, or infrastructure added?"
-    echo "  • Decision made with reasoning worth preserving?"
-    echo "  • Insight about Go CLI development or Linear API integration?"
-    echo "  • Pattern or lesson learned?"
-    echo "  • GraphQL client design decision?"
-    echo ""
-    read -p "Chronicle-worthy work in this push? [y/N/skip]: " -r response
+# Check for open chronicle beads
+OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null | grep -c "^lirt-" || true)
 
-    case "${response,,}" in
-        y|yes)
-            echo ""
-            echo "Please create a diary entry first:"
-            echo "  File: diary/$(date '+%y-%m-%d.%H-%M-%Z').<town>.<topic>.md"
-            echo "  Town: $(cd "$LIRT_ROOT" && bin/lirt-town-id get 2>/dev/null || echo 'unknown')"
-            echo ""
-            echo "Then run 'lirt-push' again."
-            exit 1
-            ;;
-        skip|s)
-            echo "⚠️  Skipping chronicle gate (not recommended)"
-            ;;
-        *)
-            echo "✓ No chronicle-worthy work - proceeding"
-            ;;
-    esac
+if [[ "$OPEN_BEADS" -gt 0 ]]; then
+    echo ""
+    echo "❌ BLOCKED: $OPEN_BEADS open chronicle bead(s) found"
+    echo ""
+    echo "Open chronicle beads:"
+    bd ready --type chronicle
+    echo ""
+    echo "Process beads before pushing:"
+    echo "  1. Run: lirt-chronicler"
+    echo "  2. Verify: bd ready --type chronicle  # Must return empty"
+    echo "  3. Then run: lirt-push"
+    echo ""
+    exit 1
 fi
+
+echo "✓ No open chronicle beads"
+echo ""
+echo "Review ALL commits being pushed for chronicle-worthy items:"
+echo "  • Decision made with reasoning worth preserving?"
+echo "  • Insight about Go CLI development or Linear API integration?"
+echo "  • Pattern or lesson learned?"
+echo "  • Course correction?"
+echo ""
+echo "If yes, create chronicle bead now:"
+echo "  bd create --title 'Chronicle: [topic]' --type chronicle --priority 3 --add-label [category] --description '[rich context]'"
+echo ""
+read -p "Any chronicle-worthy work to capture? [y/N]: " -r response
+
+case "${response,,}" in
+    y|yes)
+        echo ""
+        echo "Please create chronicle bead first, then run 'lirt-push' again."
+        exit 1
+        ;;
+    *)
+        echo "✓ No chronicle-worthy work - proceeding"
+        ;;
+esac
 
 echo ""
 echo "📤 Pushing..."

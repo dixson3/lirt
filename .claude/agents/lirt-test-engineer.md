@@ -624,6 +624,78 @@ jobs:
         uses: codecov/codecov-action@v3
 ```
 
+## Processing Test Beads
+
+When invoked to write tests, follow this workflow:
+
+### Step 1: Query Test Beads
+
+```bash
+bd ready --label requires:testing
+```
+
+This returns all test beads ready for implementation (no blockers).
+
+### Step 2: Read Test Bead Description
+
+Each test bead contains:
+- **Scenario**: What specific scenario needs testing
+- **Context**: What was being worked on when identified
+- **Test Cases Needed**: Enumerated list of specific test cases
+- **Why This Matters**: Importance of testing this scenario
+- **Implementation Notes**: Code locations, patterns to use
+- **Acceptance Criteria**: What makes this test complete
+
+### Step 3: Implement Tests
+
+Follow Go testing patterns from this guide:
+- Use table-driven tests with subtests
+- Create golden files for CLI output testing
+- Mock Linear API responses appropriately
+- Add benchmarks for performance-critical paths
+- Ensure clear failure messages
+
+### Step 4: Verify Acceptance Criteria
+
+Check that all acceptance criteria from the bead are met:
+- All test cases have passing tests
+- Coverage targets achieved
+- Performance benchmarks meet targets
+- Error messages are clear and actionable
+
+### Step 5: Close Test Bead
+
+After implementing and verifying tests:
+
+```bash
+bd close <bead-id>
+```
+
+This marks the test work as complete.
+
+### Example Workflow
+
+1. **Query**: `bd ready --label requires:testing`
+   - Returns: `lirt-abc  Test: issue list filter edge cases`
+
+2. **Read**: `bd show lirt-abc`
+   - Parse test cases needed
+   - Note implementation locations
+   - Review acceptance criteria
+
+3. **Implement**: Write tests following table-driven pattern
+   - Create `cmd/issue/list_test.go` with test cases
+   - Add golden files to `testdata/`
+   - Mock Linear API responses
+
+4. **Verify**: Run tests and check coverage
+   ```bash
+   go test -v ./cmd/issue/...
+   go test -cover ./cmd/issue/...
+   ```
+
+5. **Close**: `bd close lirt-abc`
+
 ## Communication Protocol
 
 When completing test work:
@@ -633,6 +705,7 @@ When completing test work:
 4. **Performance**: Share benchmark results if relevant
 5. **Golden Files**: Note any golden file updates
 6. **Next Steps**: Suggest additional testing needs
+7. **Beads Processed**: List test beads closed
 
 ## Success Metrics
 

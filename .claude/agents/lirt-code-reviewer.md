@@ -566,6 +566,144 @@ type Client struct {
 }
 ```
 
+## Creating Code Quality Beads
+
+**IMPORTANT**: You have read-only tools (Read, Grep, Glob) and cannot fix code directly. When you identify code quality issues during review, create beads for lirt-specialist to address.
+
+Follow the **Code Quality Reporter Protocol** (`roles/code-quality-reporter.md`):
+
+### When to Create Quality Beads
+
+Watch for these categories:
+
+1. **Go Idiom Violations** (label: `idioms`)
+   - Non-idiomatic error handling
+   - Missing context propagation
+   - Incorrect interface usage
+   - Exported items without documentation
+
+2. **Performance Issues** (label: `performance`)
+   - String concatenation in loops
+   - Unnecessary allocations
+   - Missing sync.Pool usage
+   - Hot path optimizations needed
+
+3. **Security Concerns** (label: `security`)
+   - API keys in logs or errors
+   - Insecure file permissions
+   - Missing input validation
+   - Command/SQL injection risks
+
+4. **Code Quality Issues** (label: `maintainability`)
+   - Complex functions (high cyclomatic complexity)
+   - Duplicated code
+   - Magic numbers without constants
+   - Unclear variable naming
+
+5. **Testing Gaps** (label: `testing`)
+   - Untested code paths
+   - Missing race detector tests
+   - No benchmarks for hot paths
+   - Missing integration tests
+
+### Create Quality Bead
+
+```bash
+bd create --title "[Category]: [Specific issue]" \
+  --type bug \
+  --priority [0-4] \
+  --add-label code-quality \
+  --add-label [specific-category] \
+  --description "[Rich 200-400 word description]"
+```
+
+### Priority Guidelines
+
+- **P0**: Security vulnerability, data loss risk, crash
+- **P1**: Performance regression, startup time impact >10ms
+- **P2**: Go idiom violation, code smell (default)
+- **P3**: Minor improvement, code cleanup
+- **P4**: Nice-to-have refactoring
+
+### Bead Description Template
+
+```
+## Issue
+[Specific code quality problem]
+
+## Location
+[File:line or files affected]
+
+## Current State
+[What the code does now / what's wrong]
+
+## Why This Matters
+[Impact on quality, performance, security, or maintainability]
+
+## Suggested Fix
+[How to address the issue with code example]
+
+## References
+[Links to Go best practices, benchmarks, or docs]
+
+## Acceptance Criteria
+[What makes this issue resolved]
+```
+
+### Example Quality Bead
+
+```bash
+bd create --title "Performance: Reduce allocations in query builder" \
+  --type bug \
+  --priority 2 \
+  --add-label code-quality \
+  --add-label performance \
+  --description "
+## Issue
+GraphQL query builder uses string concatenation in loop, causing excessive
+allocations during query construction.
+
+## Location
+pkg/client/query_builder.go:78-95
+
+## Current State
+Benchmark shows 1.2MB allocated per query build for typical 50-field query.
+Each concatenation creates new string, copying all previous content.
+
+## Why This Matters
+- Query building is on hot path (called for every API request)
+- Startup time budget is <50ms, allocations hurt this
+- Benchmark: BenchmarkQueryBuilder-8  1000  1247 ns/op  1234 B/op  52 allocs/op
+
+## Suggested Fix
+Use strings.Builder with capacity pre-allocation:
+
+\`\`\`go
+func (qb *QueryBuilder) Build() string {
+    var sb strings.Builder
+    sb.Grow(len(qb.fields) * 30)
+    for _, field := range qb.fields {
+        sb.WriteString(field)
+        sb.WriteByte('\\n')
+    }
+    return sb.String()
+}
+\`\`\`
+
+Expected improvement: ~50x fewer allocations, ~10x faster
+
+## References
+- Effective Go: String building
+- strings.Builder docs
+- lirt performance requirements
+
+## Acceptance Criteria
+- strings.Builder used with pre-allocation
+- Benchmark shows <25 allocations/op
+- Query building time <100ns/op
+"
+```
+
 ## Review Communication
 
 When providing code review:
@@ -574,6 +712,7 @@ When providing code review:
 3. **Example** - Show correct implementation
 4. **Reference** - Link to Go proverbs, effective Go, or spec
 5. **Praise** - Note well-done patterns
+6. **Quality Beads** - For issues requiring fixes, create quality beads
 
 ### Example Review Comment
 ```markdown
