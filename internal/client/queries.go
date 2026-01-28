@@ -1412,3 +1412,149 @@ func (c *Client) ListUserIssues(ctx context.Context, userID string) ([]model.Iss
 
 	return issues, nil
 }
+
+// CommentsQuery represents the GraphQL comments query
+type CommentsQuery struct {
+	Comments struct {
+		Nodes []struct {
+			ID        string `graphql:"id"`
+			Body      string `graphql:"body"`
+			User      struct {
+				ID   string `graphql:"id"`
+				Name string `graphql:"name"`
+			} `graphql:"user"`
+			CreatedAt string `graphql:"createdAt"`
+			UpdatedAt string `graphql:"updatedAt"`
+		} `graphql:"nodes"`
+	} `graphql:"comments(filter: $filter)"`
+}
+
+// ListIssueComments fetches comments for an issue
+func (c *Client) ListIssueComments(ctx context.Context, issueID string) ([]model.Comment, error) {
+	variables := map[string]interface{}{
+		"filter": map[string]interface{}{
+			"issue": map[string]interface{}{
+				"id": map[string]interface{}{
+					"eq": issueID,
+				},
+			},
+		},
+	}
+
+	var query CommentsQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	comments := make([]model.Comment, 0, len(query.Comments.Nodes))
+	for _, node := range query.Comments.Nodes {
+		comments = append(comments, model.Comment{
+			ID:   node.ID,
+			Body: node.Body,
+			User: &model.User{
+				ID:   node.User.ID,
+				Name: node.User.Name,
+			},
+		})
+	}
+
+	return comments, nil
+}
+
+// CreateCommentMutation represents the comment creation mutation
+type CreateCommentMutation struct {
+	CommentCreate struct {
+		Success bool `graphql:"success"`
+		Comment struct {
+			ID   string `graphql:"id"`
+			Body string `graphql:"body"`
+		} `graphql:"comment"`
+	} `graphql:"commentCreate(input: $input)"`
+}
+
+// CreateCommentInput represents input for creating a comment
+type CreateCommentInput struct {
+	IssueID *string `json:"issueId,omitempty"`
+	Body    string  `json:"body"`
+}
+
+// CreateComment creates a new comment
+func (c *Client) CreateComment(ctx context.Context, input *CreateCommentInput) (*model.Comment, error) {
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	var mutation CreateCommentMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	if !mutation.CommentCreate.Success {
+		return nil, fmt.Errorf("failed to create comment")
+	}
+
+	return &model.Comment{
+		ID:   mutation.CommentCreate.Comment.ID,
+		Body: mutation.CommentCreate.Comment.Body,
+	}, nil
+}
+
+// UpdateCommentMutation represents the comment update mutation
+type UpdateCommentMutation struct {
+	CommentUpdate struct {
+		Success bool `graphql:"success"`
+		Comment struct {
+			ID   string `graphql:"id"`
+			Body string `graphql:"body"`
+		} `graphql:"comment"`
+	} `graphql:"commentUpdate(id: $id, input: $input)"`
+}
+
+// UpdateCommentInput represents input for updating a comment
+type UpdateCommentInput struct {
+	Body string `json:"body"`
+}
+
+// UpdateComment updates an existing comment
+func (c *Client) UpdateComment(ctx context.Context, id string, input *UpdateCommentInput) error {
+	variables := map[string]interface{}{
+		"id":    id,
+		"input": input,
+	}
+
+	var mutation UpdateCommentMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.CommentUpdate.Success {
+		return fmt.Errorf("failed to update comment")
+	}
+
+	return nil
+}
+
+// DeleteCommentMutation represents the comment deletion mutation
+type DeleteCommentMutation struct {
+	CommentDelete struct {
+		Success bool `graphql:"success"`
+	} `graphql:"commentDelete(id: $id)"`
+}
+
+// DeleteComment deletes a comment
+func (c *Client) DeleteComment(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation DeleteCommentMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.CommentDelete.Success {
+		return fmt.Errorf("failed to delete comment")
+	}
+
+	return nil
+}
