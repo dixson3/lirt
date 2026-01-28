@@ -40,3 +40,35 @@ func (c *Client) GetViewer(ctx context.Context) (*model.Viewer, error) {
 
 	return viewer, nil
 }
+
+// TeamsQuery represents the GraphQL teams query
+type TeamsQuery struct {
+	Teams struct {
+		Nodes []struct {
+			ID          string `graphql:"id"`
+			Key         string `graphql:"key"`
+			Name        string `graphql:"name"`
+			Description string `graphql:"description"`
+		} `graphql:"nodes"`
+	} `graphql:"teams"`
+}
+
+// ListTeams fetches all teams
+func (c *Client) ListTeams(ctx context.Context) ([]model.Team, error) {
+	var query TeamsQuery
+	if err := c.Query(ctx, &query, nil); err != nil {
+		return nil, err
+	}
+
+	teams := make([]model.Team, 0, len(query.Teams.Nodes))
+	for _, node := range query.Teams.Nodes {
+		teams = append(teams, model.Team{
+			ID:          node.ID,
+			Key:         node.Key,
+			Name:        node.Name,
+			Description: node.Description,
+		})
+	}
+
+	return teams, nil
+}
