@@ -101,16 +101,38 @@ make test-api
 - Tests check for `LINEAR_TEST_API_KEY` and skip if not set
 - No files needed
 
-### Method 4: Claude Code Hook (Future)
+### Method 4: Claude Code Hook (Automatic)
 
-**Best for**: Automated credential loading when Claude Code is active in a project
+**Best for**: Seamless integration with Claude Code - credentials load automatically
 
-**Status**: Not yet implemented (requires Claude Code hook configuration)
+**Status**: ✅ Implemented and active
 
-**Planned approach**:
+**How it works**:
+- Claude Code automatically runs `~/.claude/hooks/pre-tool-call.sh` before every tool
+- Hook loads `.env.test` files automatically when present
+- No manual setup needed once hook is installed
+
+**Setup** (one-time):
 ```bash
-# Pre-tool-call hook would automatically load .env.test
-# when Claude executes tools in the lirt project
+# Hook is already installed at ~/.claude/hooks/pre-tool-call.sh
+# Verify it's working:
+~/.claude/hooks/verify-hook.sh
+
+# Create .env.test in your project:
+cp .env.test.example .env.test
+vim .env.test  # Add your credentials
+```
+
+**What happens automatically**:
+1. You create `.env.test` in project root
+2. Claude Code detects hook before running tools
+3. Hook loads environment variables
+4. Tests and commands automatically have access to credentials
+
+**Verify hook is active**:
+```bash
+ls -la ~/.claude/hooks/pre-tool-call.sh  # Should be executable
+~/.claude/hooks/verify-hook.sh           # Run verification tests
 ```
 
 ## Getting a Test API Key
