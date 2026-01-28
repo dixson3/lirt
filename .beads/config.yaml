@@ -1,7 +1,0 @@
-prefix: lirt
-
-sync-branch: "beads-sync"
-
-types:
-  custom:
-    - chronicle
