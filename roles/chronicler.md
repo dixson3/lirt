@@ -88,7 +88,7 @@ Example: `26-01-27.13-45-PST.Gastown.graphql-client-design.md`
 
 ## Triggers
 
-The Chronicler should be activated when:
+**ALL agents working on lirt** must watch for chronicle-worthy moments:
 
 1. A significant decision is made during lirt development
 2. An insight emerges about Go CLI development or Linear API integration
@@ -96,9 +96,35 @@ The Chronicler should be activated when:
 4. Direction changes based on new understanding
 5. Work completes with lessons worth preserving
 
-## Maintaining the Index
+## When Triggered: Invoke the Chronicler Agent
 
-After creating each entry, update `diary/_index.md`:
+When you identify something chronicle-worthy, **invoke the lirt-chronicler agent** with rich context:
 
-1. Add entry link under "## Entries" (newest first)
-2. Format: `- [{date}] [{title}](./{filename})`
+```
+Ask lirt-chronicler to document [context]:
+
+[Provide detailed context including:]
+- What decision/insight/pattern/correction/lesson occurred
+- The reasoning or circumstances
+- Key trade-offs or considerations
+- Implications for future work
+```
+
+**Example invocation:**
+```
+Ask lirt-chronicler to document our GraphQL pagination approach:
+
+We chose cursor-based pagination with 50-item page size for the issue list command.
+The decision balanced API efficiency (fewer round-trips) with memory usage (smaller
+result sets). Linear's API supports both offset and cursor pagination, but cursor is
+more efficient for large datasets and handles concurrent updates better.
+
+This sets the pattern for all future list commands in lirt.
+```
+
+The lirt-chronicler agent will:
+1. Create the properly formatted diary entry
+2. Update the diary index
+3. Handle all the formatting details
+
+Your job is **detection** (recognizing chronicle-worthy moments), not **execution** (writing entries).

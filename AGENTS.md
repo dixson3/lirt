@@ -79,11 +79,25 @@ diary/
 
 ### Creating a Diary Entry
 
-1. Create file: `diary/{YY-MM-DD}.{HH-MM-TZ}.{town}.{topic}.md`
-   - Get town ID: `lirt-town-id get`
-2. Use the template from `roles/chronicler.md`
-3. Update `diary/_index.md` (newest entry first)
-4. Commit with message: `diary: {Title}`
+When you identify something chronicle-worthy, **invoke the lirt-chronicler agent**:
+
+```
+Ask lirt-chronicler to document [context]:
+
+[Provide rich context:]
+- What happened (decision/insight/pattern/correction/lesson)
+- The reasoning behind it
+- Key trade-offs or considerations
+- Implications for future work
+```
+
+The lirt-chronicler agent will:
+1. Create the properly formatted diary entry
+2. Get town ID automatically (`lirt-town-id get`)
+3. Use the template from `roles/chronicler.md`
+4. Update `diary/_index.md` (newest entry first)
+
+Your job is **detection**, not **execution**.
 
 ### When to Chronicle
 

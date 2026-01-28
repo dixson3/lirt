@@ -4,7 +4,7 @@ This document describes the specialized crew member agents for the lirt project.
 
 ## Overview
 
-lirt has 4 crew member agents adapted from [awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) and customized for Go CLI development, Linear GraphQL API integration, and bash scripting workflows.
+lirt has 5 crew member agents: 4 adapted from [awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) and customized for Go CLI development, plus a dedicated chronicler agent for capturing development insights.
 
 ## Crew Members
 
@@ -119,6 +119,38 @@ Specialized in reviewing:
 - Memory allocation optimization
 - Security best practices
 
+---
+
+### 5. lirt-chronicler
+**File:** `.claude/agents/lirt-chronicler.md`
+**Role:** Development Historian
+**Expertise:** Diary Entry Creation, Insight Documentation
+
+The diary writer for lirt development insights:
+- Creates formatted diary entries following the chronicler protocol
+- Documents decisions, insights, patterns, corrections, and lessons
+- Maintains diary index
+- Ensures consistent entry format and style
+
+**When to Use:**
+- When any agent identifies something chronicle-worthy
+- After making a significant decision (invoked by the deciding agent)
+- After discovering an insight (invoked by the discovering agent)
+- After recognizing a pattern (invoked by the recognizing agent)
+
+**Invocation Pattern:**
+Other agents invoke with context:
+```
+Ask lirt-chronicler to document [rich context about what's worth chronicling]
+```
+
+**Key Responsibilities:**
+- Extract core insight from provided context
+- Create well-formatted diary entry
+- Update diary/_index.md
+- Follow template religiously
+- Maintain consistent voice and style
+
 ## Agent Coordination
 
 ### Development Workflow
@@ -142,6 +174,8 @@ Specialized in reviewing:
 ┌──────────────────┐
 │  Code Review     │  lirt-code-reviewer validates quality
 └──────────────────┘
+
+Cross-cutting: lirt-chronicler documents insights from any agent
 ```
 
 ### Example Usage
