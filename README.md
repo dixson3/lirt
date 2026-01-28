@@ -41,51 +41,88 @@ See [Usage](#usage) section below for CLI reference.
 
 ---
 
-## Project Layout
+## Repository Structure
 
-This project uses **Gas Town infrastructure** for multi-agent coordination:
+This repository contains both **Go CLI code** and **Gas Town agent infrastructure**:
 
 ```
-lirt/
-├── .beads/                      # Issue tracking & coordination
-│   ├── config.yaml             # Beads configuration (committed)
-│   └── issues.jsonl            # Issue database (on beads-sync branch)
+lirt/ (github.com:dixson3/lirt.git)
 │
-├── refinery/rig/               # Main development workspace
-│   ├── .claude/                # Claude Code agent definitions
-│   │   ├── agents/            # Specialized agents (5 crew members)
-│   │   └── CREW-MEMBERS.md    # Agent documentation
-│   │
-│   ├── roles/                  # Agent protocols (cross-cutting)
-│   │   ├── chronicler.md      # Chronicle protocol
-│   │   ├── test-case-identifier.md
-│   │   └── code-quality-reporter.md
-│   │
-│   ├── diary/                  # Development insights chronicle
-│   │   ├── _index.md          # Diary index
-│   │   └── *.md               # Individual diary entries
-│   │
-│   ├── bin/                    # Gas Town utilities
-│   │   ├── lirt-push          # Pre-push chronicle gate
-│   │   ├── lirt-setup-hooks   # Install hooks
-│   │   └── lirt-town-id       # Town identifier
-│   │
-│   ├── AGENTS.md               # Agent coordination documentation
-│   ├── CLAUDE.md               # Context recovery reference
-│   └── README.md               # This file
+├── .beads/                      # Beads coordination (main branch: config only)
+│   └── config.yaml             # Beads configuration
+│                               # (beads-sync branch has full database)
 │
-├── witness/                    # Monitors polecat health
-├── polecats/                   # Ephemeral worker instances
-└── crew/                       # Isolated workspace (gitignored)
+├── .claude/                     # Claude Code agent definitions
+│   ├── agents/                 # 5 specialized crew members
+│   │   ├── lirt-chronicler.md
+│   │   ├── lirt-code-reviewer.md
+│   │   ├── lirt-spec-writer.md
+│   │   ├── lirt-specialist.md
+│   │   └── lirt-test-engineer.md
+│   └── CREW-MEMBERS.md         # Agent documentation
+│
+├── bin/                         # Gas Town utilities
+│   ├── lirt-push               # Pre-push chronicle gate
+│   ├── lirt-setup-hooks        # Install hooks
+│   └── lirt-town-id            # Town identifier
+│
+├── diary/                       # Development insights chronicle
+│   ├── _index.md               # Diary index
+│   └── *.md                    # Individual diary entries
+│
+├── roles/                       # Agent protocols (cross-cutting)
+│   ├── chronicler.md           # Chronicle protocol
+│   ├── test-case-identifier.md # Test identification protocol
+│   └── code-quality-reporter.md # Code quality protocol
+│
+├── cmd/                         # Go CLI application (future)
+│   └── lirt/
+│       └── main.go
+│
+├── internal/                    # Go packages (future)
+│   ├── client/                 # Linear GraphQL client
+│   ├── config/                 # Configuration management
+│   └── ...
+│
+├── .gitignore
+├── AGENTS.md                    # Agent coordination documentation
+├── LICENSE
+├── README.md                    # This file
+└── go.mod                       # Go module definition (future)
 ```
+
+### Branch Structure
+
+- **`main`**: Agent infrastructure + Go code
+  - `.beads/config.yaml` only (database NOT on main)
+  - All `.claude/`, `roles/`, `diary/`, `bin/` files
+  - Go source code (when implemented)
+
+- **`beads-sync`**: Beads issue database
+  - `.beads/.gitignore`
+  - `.beads/issues.jsonl` (issue database)
+  - `.beads/metadata.json`
+  - `.beads/interactions.jsonl`
+  - `.beads/README.md`, `.beads/PRIME.md`
+
+### What's NOT in This Repo
+
+The following Gas Town infrastructure exists locally but is **NOT pushed upstream**:
+- `refinery/rig/` - worktree checkout created by Gas Town
+- `witness/` - agent monitoring (Gas Town level)
+- `polecats/` - ephemeral workers (Gas Town level)
+- `crew/` - isolated workspace (gitignored)
+
+These are part of the Gas Town rig structure at `/Users/<user>/gt/lirt/` but not in the git repository itself.
 
 ### Key Directories
 
-- **`.beads/`**: Persistent issue tracking across sessions and agents
-- **`refinery/rig/`**: Primary development workspace (sparse checkout of main repo)
-- **`diary/`**: Chronicle of development decisions, insights, and patterns
-- **`.claude/agents/`**: Specialized agent definitions (lirt-specialist, lirt-test-engineer, etc.)
+- **`.beads/`**: Beads configuration (main) and database (beads-sync branch)
+- **`.claude/agents/`**: 5 specialized agents for lirt development
 - **`roles/`**: Cross-cutting protocols that all agents follow
+- **`diary/`**: Chronicle of development decisions, insights, and patterns
+- **`bin/`**: Gas Town utilities (hooks, push gate, town ID)
+- **`cmd/`, `internal/`**: Go source code (to be implemented)
 
 ---
 
