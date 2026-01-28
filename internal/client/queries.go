@@ -823,3 +823,244 @@ func (c *Client) ListProjectIssues(ctx context.Context, projectID string) ([]mod
 
 	return issues, nil
 }
+
+// MilestonesQuery represents the GraphQL milestones query
+type MilestonesQuery struct {
+	Milestones struct {
+		Nodes []struct {
+			ID          string  `graphql:"id"`
+			Name        string  `graphql:"name"`
+			Description string  `graphql:"description"`
+			TargetDate  *string `graphql:"targetDate"`
+			Project     struct {
+				ID   string `graphql:"id"`
+				Name string `graphql:"name"`
+			} `graphql:"project"`
+			CreatedAt string `graphql:"createdAt"`
+		} `graphql:"nodes"`
+	} `graphql:"milestones(filter: $filter)"`
+}
+
+// ListMilestones fetches milestones, optionally filtered by project
+func (c *Client) ListMilestones(ctx context.Context, projectID string) ([]model.Milestone, error) {
+	variables := map[string]interface{}{}
+
+	if projectID != "" {
+		variables["filter"] = map[string]interface{}{
+			"project": map[string]interface{}{
+				"id": map[string]interface{}{
+					"eq": projectID,
+				},
+			},
+		}
+	}
+
+	var query MilestonesQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	milestones := make([]model.Milestone, 0, len(query.Milestones.Nodes))
+	for _, node := range query.Milestones.Nodes {
+		milestone := model.Milestone{
+			ID:          node.ID,
+			Name:        node.Name,
+			Description: node.Description,
+			Project: &model.Project{
+				ID:   node.Project.ID,
+				Name: node.Project.Name,
+			},
+		}
+
+		milestones = append(milestones, milestone)
+	}
+
+	return milestones, nil
+}
+
+// MilestoneQuery represents a single milestone query
+type MilestoneQuery struct {
+	Milestone struct {
+		ID          string  `graphql:"id"`
+		Name        string  `graphql:"name"`
+		Description string  `graphql:"description"`
+		TargetDate  *string `graphql:"targetDate"`
+		Project     struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"project"`
+		CreatedAt string `graphql:"createdAt"`
+	} `graphql:"milestone(id: $id)"`
+}
+
+// GetMilestone fetches a single milestone by ID
+func (c *Client) GetMilestone(ctx context.Context, id string) (*model.Milestone, error) {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var query MilestoneQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	milestone := &model.Milestone{
+		ID:          query.Milestone.ID,
+		Name:        query.Milestone.Name,
+		Description: query.Milestone.Description,
+		Project: &model.Project{
+			ID:   query.Milestone.Project.ID,
+			Name: query.Milestone.Project.Name,
+		},
+	}
+
+	return milestone, nil
+}
+
+// CreateMilestoneMutation represents the milestone creation mutation
+type CreateMilestoneMutation struct {
+	MilestoneCreate struct {
+		Success   bool `graphql:"success"`
+		Milestone struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"milestone"`
+	} `graphql:"milestoneCreate(input: $input)"`
+}
+
+// CreateMilestoneInput represents input for creating a milestone
+type CreateMilestoneInput struct {
+	ProjectID   string  `json:"projectId"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	TargetDate  *string `json:"targetDate,omitempty"`
+}
+
+// CreateMilestone creates a new milestone
+func (c *Client) CreateMilestone(ctx context.Context, input *CreateMilestoneInput) (*model.Milestone, error) {
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	var mutation CreateMilestoneMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	if !mutation.MilestoneCreate.Success {
+		return nil, fmt.Errorf("failed to create milestone")
+	}
+
+	return &model.Milestone{
+		ID:   mutation.MilestoneCreate.Milestone.ID,
+		Name: mutation.MilestoneCreate.Milestone.Name,
+	}, nil
+}
+
+// UpdateMilestoneMutation represents the milestone update mutation
+type UpdateMilestoneMutation struct {
+	MilestoneUpdate struct {
+		Success   bool `graphql:"success"`
+		Milestone struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"milestone"`
+	} `graphql:"milestoneUpdate(id: $id, input: $input)"`
+}
+
+// UpdateMilestoneInput represents input for updating a milestone
+type UpdateMilestoneInput struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	TargetDate  *string `json:"targetDate,omitempty"`
+}
+
+// UpdateMilestone updates an existing milestone
+func (c *Client) UpdateMilestone(ctx context.Context, id string, input *UpdateMilestoneInput) error {
+	variables := map[string]interface{}{
+		"id":    id,
+		"input": input,
+	}
+
+	var mutation UpdateMilestoneMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.MilestoneUpdate.Success {
+		return fmt.Errorf("failed to update milestone")
+	}
+
+	return nil
+}
+
+// DeleteMilestoneMutation represents the milestone deletion mutation
+type DeleteMilestoneMutation struct {
+	MilestoneDelete struct {
+		Success bool `graphql:"success"`
+	} `graphql:"milestoneDelete(id: $id)"`
+}
+
+// DeleteMilestone deletes a milestone
+func (c *Client) DeleteMilestone(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation DeleteMilestoneMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.MilestoneDelete.Success {
+		return fmt.Errorf("failed to delete milestone")
+	}
+
+	return nil
+}
+
+// MilestoneIssuesQuery represents issues for a milestone
+type MilestoneIssuesQuery struct {
+	Milestone struct {
+		Issues struct {
+			Nodes []struct {
+				ID         string `graphql:"id"`
+				Identifier string `graphql:"identifier"`
+				Title      string `graphql:"title"`
+				State      struct {
+					Name string `graphql:"name"`
+					Type string `graphql:"type"`
+				} `graphql:"state"`
+			} `graphql:"nodes"`
+		} `graphql:"issues"`
+	} `graphql:"milestone(id: $id)"`
+}
+
+// ListMilestoneIssues fetches issues for a milestone
+func (c *Client) ListMilestoneIssues(ctx context.Context, milestoneID string) ([]model.Issue, error) {
+	variables := map[string]interface{}{
+		"id": milestoneID,
+	}
+
+	var query MilestoneIssuesQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	milestoneIssues := make([]model.Issue, 0, len(query.Milestone.Issues.Nodes))
+	for _, node := range query.Milestone.Issues.Nodes {
+		issue := model.Issue{
+			ID:         node.ID,
+			Identifier: node.Identifier,
+			Title:      node.Title,
+			State: &model.State{
+				Name: node.State.Name,
+				Type: node.State.Type,
+			},
+		}
+
+		milestoneIssues = append(milestoneIssues, issue)
+	}
+
+	return milestoneIssues, nil
+}
