@@ -1293,3 +1293,122 @@ func (c *Client) ListInitiativeProjects(ctx context.Context, initiativeID string
 
 	return projects, nil
 }
+
+// UsersQuery represents the GraphQL users query
+type UsersQuery struct {
+	Users struct {
+		Nodes []struct {
+			ID          string `graphql:"id"`
+			Name        string `graphql:"name"`
+			Email       string `graphql:"email"`
+			DisplayName string `graphql:"displayName"`
+			Active      bool   `graphql:"active"`
+		} `graphql:"nodes"`
+	} `graphql:"users"`
+}
+
+// ListUsers fetches all users
+func (c *Client) ListUsers(ctx context.Context) ([]model.User, error) {
+	var query UsersQuery
+	if err := c.Query(ctx, &query, nil); err != nil {
+		return nil, err
+	}
+
+	users := make([]model.User, 0, len(query.Users.Nodes))
+	for _, node := range query.Users.Nodes {
+		users = append(users, model.User{
+			ID:          node.ID,
+			Name:        node.Name,
+			Email:       node.Email,
+			DisplayName: node.DisplayName,
+			Active:      node.Active,
+		})
+	}
+
+	return users, nil
+}
+
+// UserQuery represents a single user query
+type UserQuery struct {
+	User struct {
+		ID          string `graphql:"id"`
+		Name        string `graphql:"name"`
+		Email       string `graphql:"email"`
+		DisplayName string `graphql:"displayName"`
+		Active      bool   `graphql:"active"`
+	} `graphql:"user(id: $id)"`
+}
+
+// GetUser fetches a single user by ID
+func (c *Client) GetUser(ctx context.Context, id string) (*model.User, error) {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var query UserQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	user := &model.User{
+		ID:          query.User.ID,
+		Name:        query.User.Name,
+		Email:       query.User.Email,
+		DisplayName: query.User.DisplayName,
+		Active:      query.User.Active,
+	}
+
+	return user, nil
+}
+
+// UserIssuesQuery represents issues for a user
+type UserIssuesQuery struct {
+	User struct {
+		AssignedIssues struct {
+			Nodes []struct {
+				ID         string `graphql:"id"`
+				Identifier string `graphql:"identifier"`
+				Title      string `graphql:"title"`
+				State      struct {
+					Name string `graphql:"name"`
+					Type string `graphql:"type"`
+				} `graphql:"state"`
+				Team struct {
+					Key string `graphql:"key"`
+				} `graphql:"team"`
+			} `graphql:"nodes"`
+		} `graphql:"assignedIssues"`
+	} `graphql:"user(id: $id)"`
+}
+
+// ListUserIssues fetches issues assigned to a user
+func (c *Client) ListUserIssues(ctx context.Context, userID string) ([]model.Issue, error) {
+	variables := map[string]interface{}{
+		"id": userID,
+	}
+
+	var query UserIssuesQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	issues := make([]model.Issue, 0, len(query.User.AssignedIssues.Nodes))
+	for _, node := range query.User.AssignedIssues.Nodes {
+		issue := model.Issue{
+			ID:         node.ID,
+			Identifier: node.Identifier,
+			Title:      node.Title,
+			State: &model.State{
+				Name: node.State.Name,
+				Type: node.State.Type,
+			},
+			Team: &model.Team{
+				Key: node.Team.Key,
+			},
+		}
+
+		issues = append(issues, issue)
+	}
+
+	return issues, nil
+}
