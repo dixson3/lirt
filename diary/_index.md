@@ -12,3 +12,5 @@ See `roles/chronicler.md` for what belongs in the diary.
 
 <!-- Add new entries here (newest first) -->
 <!-- Format: - [YYYY-MM-DD] [Title](./filename.md) -->
+
+- [2026-01-27] [Beads-Mediated Protocol System for Agent Coordination](./26-01-27.17-07-PST.gt.beads-mediated-coordination.md)
