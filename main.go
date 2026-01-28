@@ -3,11 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/dixson3/lirt/cmd"
 )
 
 var version = "dev"
 
 func main() {
-	fmt.Printf("lirt version %s\n", version)
-	os.Exit(0)
+	if err := cmd.Execute(version); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }

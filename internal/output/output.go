@@ -112,16 +112,7 @@ func (f *Formatter) outputTable(data interface{}) error {
 	}
 
 	table := tablewriter.NewWriter(f.writer)
-	table.SetHeader(headers)
-	table.SetBorder(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetTablePadding("\t")
-	table.SetNoWhiteSpace(true)
+	table.Header(headers)
 
 	for _, row := range rows {
 		record := make([]string, len(headers))
