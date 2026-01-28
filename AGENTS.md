@@ -49,7 +49,7 @@ When adding a new crew member:
 
 ## Chronicle Protocol (Beads-Mediated)
 
-The **Chronicle Protocol** captures insights in the evolution of James's thinking during lirt development. This is not a changelog—it's a record of *how* work is performed and *why* decisions are made.
+The **Chronicle Protocol** captures insights in the evolution of the Overseer's thinking during lirt development. This is not a changelog—it's a record of *how* work is performed and *why* decisions are made.
 
 **Protocol Pattern:** Detection (ALL agents) → Beads Queue → Execution (lirt-chronicler)
 
