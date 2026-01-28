@@ -1064,3 +1064,232 @@ func (c *Client) ListMilestoneIssues(ctx context.Context, milestoneID string) ([
 
 	return milestoneIssues, nil
 }
+
+// InitiativesQuery represents the GraphQL initiatives query
+type InitiativesQuery struct {
+	Initiatives struct {
+		Nodes []struct {
+			ID          string `graphql:"id"`
+			Name        string `graphql:"name"`
+			Description string `graphql:"description"`
+			CreatedAt   string `graphql:"createdAt"`
+			UpdatedAt   string `graphql:"updatedAt"`
+		} `graphql:"nodes"`
+	} `graphql:"initiatives"`
+}
+
+// ListInitiatives fetches all initiatives
+func (c *Client) ListInitiatives(ctx context.Context) ([]model.Initiative, error) {
+	var query InitiativesQuery
+	if err := c.Query(ctx, &query, nil); err != nil {
+		return nil, err
+	}
+
+	initiatives := make([]model.Initiative, 0, len(query.Initiatives.Nodes))
+	for _, node := range query.Initiatives.Nodes {
+		initiatives = append(initiatives, model.Initiative{
+			ID:          node.ID,
+			Name:        node.Name,
+			Description: node.Description,
+		})
+	}
+
+	return initiatives, nil
+}
+
+// InitiativeQuery represents a single initiative query
+type InitiativeQuery struct {
+	Initiative struct {
+		ID          string `graphql:"id"`
+		Name        string `graphql:"name"`
+		Description string `graphql:"description"`
+		Projects    struct {
+			Nodes []struct {
+				ID   string `graphql:"id"`
+				Name string `graphql:"name"`
+			} `graphql:"nodes"`
+		} `graphql:"projects"`
+		CreatedAt string `graphql:"createdAt"`
+		UpdatedAt string `graphql:"updatedAt"`
+	} `graphql:"initiative(id: $id)"`
+}
+
+// GetInitiative fetches a single initiative by ID
+func (c *Client) GetInitiative(ctx context.Context, id string) (*model.Initiative, error) {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var query InitiativeQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	initiative := &model.Initiative{
+		ID:          query.Initiative.ID,
+		Name:        query.Initiative.Name,
+		Description: query.Initiative.Description,
+	}
+
+	return initiative, nil
+}
+
+// CreateInitiativeMutation represents the initiative creation mutation
+type CreateInitiativeMutation struct {
+	InitiativeCreate struct {
+		Success    bool `graphql:"success"`
+		Initiative struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"initiative"`
+	} `graphql:"initiativeCreate(input: $input)"`
+}
+
+// CreateInitiativeInput represents input for creating an initiative
+type CreateInitiativeInput struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+}
+
+// CreateInitiative creates a new initiative
+func (c *Client) CreateInitiative(ctx context.Context, input *CreateInitiativeInput) (*model.Initiative, error) {
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	var mutation CreateInitiativeMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	if !mutation.InitiativeCreate.Success {
+		return nil, fmt.Errorf("failed to create initiative")
+	}
+
+	return &model.Initiative{
+		ID:   mutation.InitiativeCreate.Initiative.ID,
+		Name: mutation.InitiativeCreate.Initiative.Name,
+	}, nil
+}
+
+// UpdateInitiativeMutation represents the initiative update mutation
+type UpdateInitiativeMutation struct {
+	InitiativeUpdate struct {
+		Success    bool `graphql:"success"`
+		Initiative struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"initiative"`
+	} `graphql:"initiativeUpdate(id: $id, input: $input)"`
+}
+
+// UpdateInitiativeInput represents input for updating an initiative
+type UpdateInitiativeInput struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// UpdateInitiative updates an existing initiative
+func (c *Client) UpdateInitiative(ctx context.Context, id string, input *UpdateInitiativeInput) error {
+	variables := map[string]interface{}{
+		"id":    id,
+		"input": input,
+	}
+
+	var mutation UpdateInitiativeMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.InitiativeUpdate.Success {
+		return fmt.Errorf("failed to update initiative")
+	}
+
+	return nil
+}
+
+// ArchiveInitiativeMutation represents the initiative archive mutation
+type ArchiveInitiativeMutation struct {
+	InitiativeArchive struct {
+		Success bool `graphql:"success"`
+	} `graphql:"initiativeArchive(id: $id)"`
+}
+
+// ArchiveInitiative archives an initiative
+func (c *Client) ArchiveInitiative(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation ArchiveInitiativeMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.InitiativeArchive.Success {
+		return fmt.Errorf("failed to archive initiative")
+	}
+
+	return nil
+}
+
+// DeleteInitiativeMutation represents the initiative deletion mutation
+type DeleteInitiativeMutation struct {
+	InitiativeDelete struct {
+		Success bool `graphql:"success"`
+	} `graphql:"initiativeDelete(id: $id)"`
+}
+
+// DeleteInitiative deletes an initiative
+func (c *Client) DeleteInitiative(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation DeleteInitiativeMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.InitiativeDelete.Success {
+		return fmt.Errorf("failed to delete initiative")
+	}
+
+	return nil
+}
+
+// InitiativeProjectsQuery represents projects for an initiative
+type InitiativeProjectsQuery struct {
+	Initiative struct {
+		Projects struct {
+			Nodes []struct {
+				ID    string `graphql:"id"`
+				Name  string `graphql:"name"`
+				State string `graphql:"state"`
+			} `graphql:"nodes"`
+		} `graphql:"projects"`
+	} `graphql:"initiative(id: $id)"`
+}
+
+// ListInitiativeProjects fetches projects for an initiative
+func (c *Client) ListInitiativeProjects(ctx context.Context, initiativeID string) ([]model.Project, error) {
+	variables := map[string]interface{}{
+		"id": initiativeID,
+	}
+
+	var query InitiativeProjectsQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	projects := make([]model.Project, 0, len(query.Initiative.Projects.Nodes))
+	for _, node := range query.Initiative.Projects.Nodes {
+		projects = append(projects, model.Project{
+			ID:    node.ID,
+			Name:  node.Name,
+			State: node.State,
+		})
+	}
+
+	return projects, nil
+}
