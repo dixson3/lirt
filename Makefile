@@ -27,6 +27,20 @@ test-cover:
 	@echo "Running tests with coverage..."
 	@go test -cover ./...
 
+test-coverage:
+	@echo "Generating coverage report..."
+	@go test -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+test-short:
+	@echo "Running short tests (no API, no slow tests)..."
+	@go test -short ./...
+
+test-api:
+	@echo "Running API tests (requires LINEAR_TEST_API_KEY)..."
+	@go test ./internal/client -v -run TestAuth
+
 lint:
 	@echo "Running linters..."
 	@golangci-lint run
@@ -44,11 +58,14 @@ deps:
 .PHONY: help
 help:
 	@echo "lirt Makefile targets:"
-	@echo "  make build        - Build lirt binary to bin/lirt"
-	@echo "  make install      - Install lirt to GOPATH/bin"
-	@echo "  make test         - Run all tests"
-	@echo "  make test-verbose - Run tests with verbose output"
-	@echo "  make test-cover   - Run tests with coverage report"
-	@echo "  make lint         - Run golangci-lint"
-	@echo "  make clean        - Remove build artifacts"
-	@echo "  make deps         - Download and tidy dependencies"
+	@echo "  make build         - Build lirt binary to bin/lirt"
+	@echo "  make install       - Install lirt to GOPATH/bin"
+	@echo "  make test          - Run all tests"
+	@echo "  make test-verbose  - Run tests with verbose output"
+	@echo "  make test-cover    - Run tests with coverage summary"
+	@echo "  make test-coverage - Generate HTML coverage report"
+	@echo "  make test-short    - Run tests excluding slow/API tests"
+	@echo "  make test-api      - Run API tests (requires LINEAR_TEST_API_KEY)"
+	@echo "  make lint          - Run golangci-lint"
+	@echo "  make clean         - Remove build artifacts"
+	@echo "  make deps          - Download and tidy dependencies"

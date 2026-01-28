@@ -24,6 +24,7 @@ vendor/
 # Go coverage
 *.coverprofile
 coverage.out
+coverage.html
 
 # OS and editor files
 .DS_Store
