@@ -10,6 +10,21 @@
 .beads/.local_version
 .beads/redirect
 
+# Go build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Go coverage
+*.coverprofile
+coverage.out
+
 # OS and editor files
 .DS_Store
 *~
