@@ -526,3 +526,300 @@ func (c *Client) ListWorkflowStates(ctx context.Context, teamID string) ([]model
 
 	return states, nil
 }
+
+// ProjectsQuery represents the GraphQL projects query
+type ProjectsQuery struct {
+	Projects struct {
+		Nodes []struct {
+			ID          string `graphql:"id"`
+			Name        string `graphql:"name"`
+			Description string `graphql:"description"`
+			State       string `graphql:"state"`
+			Priority    int    `graphql:"priority"`
+			Lead        *struct {
+				ID   string `graphql:"id"`
+				Name string `graphql:"name"`
+			} `graphql:"lead"`
+			CreatedAt string `graphql:"createdAt"`
+			UpdatedAt string `graphql:"updatedAt"`
+			URL       string `graphql:"url"`
+		} `graphql:"nodes"`
+	} `graphql:"projects"`
+}
+
+// ListProjects fetches all projects
+func (c *Client) ListProjects(ctx context.Context) ([]model.Project, error) {
+	var query ProjectsQuery
+	if err := c.Query(ctx, &query, nil); err != nil {
+		return nil, err
+	}
+
+	projects := make([]model.Project, 0, len(query.Projects.Nodes))
+	for _, node := range query.Projects.Nodes {
+		project := model.Project{
+			ID:          node.ID,
+			Name:        node.Name,
+			Description: node.Description,
+			State:       node.State,
+			Priority:    node.Priority,
+			URL:         node.URL,
+		}
+
+		if node.Lead != nil {
+			project.Lead = &model.User{
+				ID:   node.Lead.ID,
+				Name: node.Lead.Name,
+			}
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
+
+// ProjectQuery represents a single project query
+type ProjectQuery struct {
+	Project struct {
+		ID          string `graphql:"id"`
+		Name        string `graphql:"name"`
+		Description string `graphql:"description"`
+		State       string `graphql:"state"`
+		Priority    int    `graphql:"priority"`
+		Lead        *struct {
+			ID          string `graphql:"id"`
+			Name        string `graphql:"name"`
+			Email       string `graphql:"email"`
+			DisplayName string `graphql:"displayName"`
+		} `graphql:"lead"`
+		Members struct {
+			Nodes []struct {
+				ID   string `graphql:"id"`
+				Name string `graphql:"name"`
+			} `graphql:"nodes"`
+		} `graphql:"members"`
+		CreatedAt string `graphql:"createdAt"`
+		UpdatedAt string `graphql:"updatedAt"`
+		URL       string `graphql:"url"`
+	} `graphql:"project(id: $id)"`
+}
+
+// GetProject fetches a single project by ID
+func (c *Client) GetProject(ctx context.Context, id string) (*model.Project, error) {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var query ProjectQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	project := &model.Project{
+		ID:          query.Project.ID,
+		Name:        query.Project.Name,
+		Description: query.Project.Description,
+		State:       query.Project.State,
+		Priority:    query.Project.Priority,
+		URL:         query.Project.URL,
+	}
+
+	if query.Project.Lead != nil {
+		project.Lead = &model.User{
+			ID:          query.Project.Lead.ID,
+			Name:        query.Project.Lead.Name,
+			Email:       query.Project.Lead.Email,
+			DisplayName: query.Project.Lead.DisplayName,
+		}
+	}
+
+	return project, nil
+}
+
+// CreateProjectMutation represents the project creation mutation
+type CreateProjectMutation struct {
+	ProjectCreate struct {
+		Success bool `graphql:"success"`
+		Project struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+			URL  string `graphql:"url"`
+		} `graphql:"project"`
+	} `graphql:"projectCreate(input: $input)"`
+}
+
+// CreateProjectInput represents input for creating a project
+type CreateProjectInput struct {
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	State       *string `json:"state,omitempty"`
+	Priority    *int    `json:"priority,omitempty"`
+	LeadID      *string `json:"leadId,omitempty"`
+	TeamIDs     *[]string `json:"teamIds,omitempty"`
+}
+
+// CreateProject creates a new project
+func (c *Client) CreateProject(ctx context.Context, input *CreateProjectInput) (*model.Project, error) {
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	var mutation CreateProjectMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	if !mutation.ProjectCreate.Success {
+		return nil, fmt.Errorf("failed to create project")
+	}
+
+	return &model.Project{
+		ID:   mutation.ProjectCreate.Project.ID,
+		Name: mutation.ProjectCreate.Project.Name,
+		URL:  mutation.ProjectCreate.Project.URL,
+	}, nil
+}
+
+// UpdateProjectMutation represents the project update mutation
+type UpdateProjectMutation struct {
+	ProjectUpdate struct {
+		Success bool `graphql:"success"`
+		Project struct {
+			ID   string `graphql:"id"`
+			Name string `graphql:"name"`
+		} `graphql:"project"`
+	} `graphql:"projectUpdate(id: $id, input: $input)"`
+}
+
+// UpdateProjectInput represents input for updating a project
+type UpdateProjectInput struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	State       *string `json:"state,omitempty"`
+	Priority    *int    `json:"priority,omitempty"`
+	LeadID      *string `json:"leadId,omitempty"`
+}
+
+// UpdateProject updates an existing project
+func (c *Client) UpdateProject(ctx context.Context, id string, input *UpdateProjectInput) error {
+	variables := map[string]interface{}{
+		"id":    id,
+		"input": input,
+	}
+
+	var mutation UpdateProjectMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.ProjectUpdate.Success {
+		return fmt.Errorf("failed to update project")
+	}
+
+	return nil
+}
+
+// ArchiveProjectMutation represents the project archive mutation
+type ArchiveProjectMutation struct {
+	ProjectArchive struct {
+		Success bool `graphql:"success"`
+	} `graphql:"projectArchive(id: $id)"`
+}
+
+// ArchiveProject archives a project
+func (c *Client) ArchiveProject(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation ArchiveProjectMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.ProjectArchive.Success {
+		return fmt.Errorf("failed to archive project")
+	}
+
+	return nil
+}
+
+// DeleteProjectMutation represents the project deletion mutation
+type DeleteProjectMutation struct {
+	ProjectDelete struct {
+		Success bool `graphql:"success"`
+	} `graphql:"projectDelete(id: $id)"`
+}
+
+// DeleteProject deletes a project
+func (c *Client) DeleteProject(ctx context.Context, id string) error {
+	variables := map[string]interface{}{
+		"id": id,
+	}
+
+	var mutation DeleteProjectMutation
+	if err := c.Mutate(ctx, &mutation, variables); err != nil {
+		return err
+	}
+
+	if !mutation.ProjectDelete.Success {
+		return fmt.Errorf("failed to delete project")
+	}
+
+	return nil
+}
+
+// ProjectIssuesQuery represents issues for a project
+type ProjectIssuesQuery struct {
+	Project struct {
+		Issues struct {
+			Nodes []struct {
+				ID         string `graphql:"id"`
+				Identifier string `graphql:"identifier"`
+				Title      string `graphql:"title"`
+				State      struct {
+					Name string `graphql:"name"`
+					Type string `graphql:"type"`
+				} `graphql:"state"`
+				Assignee *struct {
+					Name string `graphql:"name"`
+				} `graphql:"assignee"`
+			} `graphql:"nodes"`
+		} `graphql:"issues"`
+	} `graphql:"project(id: $id)"`
+}
+
+// ListProjectIssues fetches issues for a project
+func (c *Client) ListProjectIssues(ctx context.Context, projectID string) ([]model.Issue, error) {
+	variables := map[string]interface{}{
+		"id": projectID,
+	}
+
+	var query ProjectIssuesQuery
+	if err := c.Query(ctx, &query, variables); err != nil {
+		return nil, err
+	}
+
+	issues := make([]model.Issue, 0, len(query.Project.Issues.Nodes))
+	for _, node := range query.Project.Issues.Nodes {
+		issue := model.Issue{
+			ID:         node.ID,
+			Identifier: node.Identifier,
+			Title:      node.Title,
+			State: &model.State{
+				Name: node.State.Name,
+				Type: node.State.Type,
+			},
+		}
+
+		if node.Assignee != nil {
+			issue.Assignee = &model.User{
+				Name: node.Assignee.Name,
+			}
+		}
+
+		issues = append(issues, issue)
+	}
+
+	return issues, nil
+}
