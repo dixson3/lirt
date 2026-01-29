@@ -28,7 +28,8 @@ PROJECT_ROOT=$(find_project_root) || {
 cd "$PROJECT_ROOT"
 
 # Check for open chronicle beads first
-OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null || true)
+# Note: Chronicle beads use label "chronicle", not type "chronicle"
+OPEN_BEADS=$(bd list --label chronicle --status open 2>/dev/null || true)
 
 if [[ -z "$OPEN_BEADS" ]]; then
     echo "No open chronicle beads to process."
@@ -47,4 +48,4 @@ echo ""
 # 2. Create diary entries
 # 3. Update diary/_index.md
 # 4. Close processed beads
-claude --agent chronicler --print "Process all open chronicle beads into diary entries. Query with 'bd ready --type chronicle', create diary entries in diary/, update diary/_index.md, and close processed beads with 'bd close <id>'."
+claude --agent chronicler --print "Process all open chronicle beads into diary entries. Query with 'bd list --label chronicle --status open', create diary entries in diary/, update diary/_index.md, and close processed beads with 'bd close <id>'."
