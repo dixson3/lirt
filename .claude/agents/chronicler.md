@@ -34,7 +34,7 @@ claude --agent chronicler
 
 ## Diary Entry Format
 
-Filename: `{YY-MM-DD}.{HH-MM-TZ}.{town}.{topic}.md`
+Filename: `{YY-MM-DD}.{HH-MM-TZ}.lirt.{topic}.md`
 
 Example: `26-01-28.14-30-PST.lirt.functional-options-pattern.md`
 

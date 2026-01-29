@@ -7,11 +7,11 @@
 
 set -euo pipefail
 
-# Find lirt root
-find_lirt_root() {
+# Find project root (look for AGENTS.md or .git)
+find_project_root() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/diary" && -f "$dir/AGENTS.md" ]]; then
+        if [[ -f "$dir/AGENTS.md" ]] || [[ -d "$dir/.git" ]]; then
             echo "$dir"
             return 0
         fi
@@ -20,12 +20,12 @@ find_lirt_root() {
     return 1
 }
 
-LIRT_ROOT=$(find_lirt_root) || {
-    echo "Error: Not in a lirt workspace (no diary/ found)"
+PROJECT_ROOT=$(find_project_root) || {
+    echo "Error: Not in a lirt workspace"
     exit 1
 }
 
-cd "$LIRT_ROOT"
+cd "$PROJECT_ROOT"
 
 # Check for open chronicle beads first
 OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null || true)

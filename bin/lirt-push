@@ -6,11 +6,11 @@
 
 set -euo pipefail
 
-# Find lirt root (look for diary/)
-find_lirt_root() {
+# Find project root
+find_project_root() {
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -d "$dir/diary" && -f "$dir/AGENTS.md" ]]; then
+        if [[ -f "$dir/AGENTS.md" ]] || [[ -d "$dir/.git" ]]; then
             echo "$dir"
             return 0
         fi
@@ -19,24 +19,25 @@ find_lirt_root() {
     return 1
 }
 
-LIRT_ROOT=$(find_lirt_root) || {
-    echo "Error: Not in a lirt workspace (no diary/ found)"
+PROJECT_ROOT=$(find_project_root) || {
+    echo "Error: Not in a lirt workspace"
     exit 1
 }
 
-cd "$LIRT_ROOT"
+cd "$PROJECT_ROOT"
 
-echo "🔍 Pre-Push Chronicle Gate..."
+echo "Pre-Push Chronicle Gate..."
 
 # Check for open chronicle beads
-OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null | grep -c "^lirt-" || true)
+OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null | grep -v "^$" | head -20 || true)
 
-if [[ "$OPEN_BEADS" -gt 0 ]]; then
+if [[ -n "$OPEN_BEADS" ]]; then
+    BEAD_COUNT=$(echo "$OPEN_BEADS" | wc -l | tr -d ' ')
     echo ""
-    echo "❌ BLOCKED: $OPEN_BEADS open chronicle bead(s) found"
+    echo "BLOCKED: $BEAD_COUNT open chronicle bead(s) found"
     echo ""
     echo "Open chronicle beads:"
-    bd ready --type chronicle
+    echo "$OPEN_BEADS"
     echo ""
     echo "Process beads before pushing:"
     echo "  1. Run: lirt-chronicler"
@@ -46,30 +47,9 @@ if [[ "$OPEN_BEADS" -gt 0 ]]; then
     exit 1
 fi
 
-echo "✓ No open chronicle beads"
+echo "No open chronicle beads"
 echo ""
-echo "Review ALL commits being pushed for chronicle-worthy items:"
-echo "  • Decision made with reasoning worth preserving?"
-echo "  • Insight about Go CLI development or Linear API integration?"
-echo "  • Pattern or lesson learned?"
-echo "  • Course correction?"
-echo ""
-echo "If yes, create chronicle bead now:"
-echo "  bd create --title 'Chronicle: [topic]' --type chronicle --priority 3 --add-label [category] --description '[rich context]'"
-echo ""
-read -p "Any chronicle-worthy work to capture? [y/N]: " -r response
 
-case "${response,,}" in
-    y|yes)
-        echo ""
-        echo "Please create chronicle bead first, then run 'lirt-push' again."
-        exit 1
-        ;;
-    *)
-        echo "✓ No chronicle-worthy work - proceeding"
-        ;;
-esac
-
-echo ""
-echo "📤 Pushing..."
-exec git push "$@"
+# Proceed with push
+echo "Pushing..."
+git push "$@"

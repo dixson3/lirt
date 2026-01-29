@@ -1,11 +1,11 @@
 #!/bin/bash
-# lirt-setup-hooks: Install lirt hooks in workspaces
+# lirt-setup-hooks: Install chronicler hooks in workspaces
 # Usage: lirt-setup-hooks [--check] [workspace...]
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIRT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Hook configuration as JSON
 HOOKS_JSON='{
@@ -16,7 +16,7 @@ HOOKS_JSON='{
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Chronicle Review:\\n\\n1. Chronicle-worthy? (new capability, decision, insight, pattern, Go/GraphQL lessons?)\\n   → If yes: Create chronicle bead IMMEDIATELY (bd create --type chronicle ...)\\n\\n2. See roles/chronicler.md for the detection protocol and rich description template.\\n\\nDo NOT proceed until you have reviewed ALL session work for chronicle-worthy items.\\n\""
+            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Chronicle Review:\\n\\n1. Chronicle-worthy? (new capability, decision, insight, pattern, lessons?)\\n   → If yes: Create chronicle bead IMMEDIATELY (bd create --type chronicle ...)\\n\\n2. See roles/chronicler.md for the detection protocol and rich description template.\\n\\nDo NOT proceed until you have reviewed ALL session work for chronicle-worthy items.\\n\""
           }
         ]
       }
@@ -27,7 +27,7 @@ HOOKS_JSON='{
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\\n⚠️  PRE-PUSH CHRONICLE GATE\\n\\nReview ALL commits being pushed:\\n\\n□ Chronicle-worthy? (new capability, decision, insight, Go patterns, GraphQL design?)\\n  → If yes: Create chronicle bead BEFORE pushing (bd create --type chronicle ...)\\n\\n□ Open chronicle beads? Run: bd ready --type chronicle\\n  → If not empty: Process with lirt-chronicler BEFORE pushing\\n\\nSTOP and create beads before pushing if anything was missed.\\n\""
+            "command": "echo \"\\n⚠️  PRE-PUSH CHRONICLE GATE\\n\\nReview ALL commits being pushed:\\n\\n□ Chronicle-worthy? (new capability, decision, insight, patterns, design?)\\n  → If yes: Create chronicle bead BEFORE pushing (bd create --type chronicle ...)\\n\\n□ Open chronicle beads? Run: bd ready --type chronicle\\n  → If not empty: Process with lirt-chronicler BEFORE pushing\\n\\nSTOP and create beads before pushing if anything was missed.\\n\""
           }
         ]
       }
@@ -37,7 +37,7 @@ HOOKS_JSON='{
 
 # Default workspaces to configure
 DEFAULT_WORKSPACES=(
-    "$LIRT_ROOT"
+    "$PROJECT_ROOT"
 )
 
 CHECK_ONLY=false
@@ -53,14 +53,14 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: lirt-setup-hooks [--check] [workspace...]"
             echo ""
-            echo "Install lirt hooks in Claude Code workspaces."
+            echo "Install chronicler hooks in Claude Code workspaces."
             echo ""
             echo "Options:"
             echo "  --check    Only check if hooks are installed (don't modify)"
             echo ""
             echo "Arguments:"
             echo "  workspace  Specific workspace paths to configure"
-            echo "             Default: lirt root"
+            echo "             Default: project root"
             echo ""
             echo "Hooks installed:"
             echo "  PreCompact  - Reminder to review for chronicle-worthy items"
@@ -94,7 +94,7 @@ install_hooks() {
     # Check if workspace exists
     if [[ ! -d "$workspace" ]]; then
         if [[ "$CHECK_ONLY" == "true" ]]; then
-            echo "⚠️  $workspace: directory does not exist"
+            echo "  $workspace: directory does not exist"
             return 1
         else
             echo "Creating workspace: $workspace"
@@ -105,7 +105,7 @@ install_hooks() {
     # Check mode
     if [[ "$CHECK_ONLY" == "true" ]]; then
         if [[ ! -f "$settings_file" ]]; then
-            echo "❌ $workspace: no settings.json"
+            echo "  $workspace: no settings.json"
             return 1
         fi
 
@@ -115,10 +115,10 @@ install_hooks() {
         has_pretooluse=$(jq -e '.hooks.PreToolUse | length > 0' "$settings_file" 2>/dev/null || echo "false")
 
         if [[ "$has_precompact" == "true" && "$has_pretooluse" == "true" ]]; then
-            echo "✓  $workspace: hooks installed"
+            echo "  $workspace: hooks installed"
             return 0
         else
-            echo "❌ $workspace: hooks missing (PreCompact: $has_precompact, PreToolUse: $has_pretooluse)"
+            echo "  $workspace: hooks missing (PreCompact: $has_precompact, PreToolUse: $has_pretooluse)"
             return 1
         fi
     fi
@@ -138,11 +138,11 @@ install_hooks() {
         ')
 
         echo "$merged" > "$settings_file"
-        echo "✓  $workspace: hooks updated"
+        echo "  $workspace: hooks updated"
     else
         # Create new settings file
         echo "$HOOKS_JSON" > "$settings_file"
-        echo "✓  $workspace: hooks installed"
+        echo "  $workspace: hooks installed"
     fi
 }
 
