@@ -18,7 +18,7 @@ claude --agent chronicler
 
 1. **Query open chronicle beads**:
    ```bash
-   bd ready --type chronicle
+   bd list --label chronicle --status open
    ```
 
 2. **For each bead (or group of related beads)**:
@@ -34,9 +34,24 @@ claude --agent chronicler
 
 ## Diary Entry Format
 
-Filename: `{YY-MM-DD}.{HH-MM-TZ}.lirt.{topic}.md`
+### Filename Convention (Ambassador-Aware)
 
-Example: `26-01-28.14-30-PST.lirt.functional-options-pattern.md`
+**Check if ambassador is present:**
+```bash
+lirt-ambassador alias 2>/dev/null
+```
+
+**With ambassador (town alias available):**
+```
+{YY-MM-DD}.{HH-MM-TZ}.{town-alias}.{topic}.md
+```
+Example: `26-01-28.14-30-PST.Gastown.functional-options-pattern.md`
+
+**Without ambassador:**
+```
+{YY-MM-DD}.{HH-MM-TZ}.{topic}.md
+```
+Example: `26-01-28.14-30-PST.functional-options-pattern.md`
 
 ### Entry Template
 
@@ -113,9 +128,11 @@ Do NOT group if:
 After creating entries, update `diary/_index.md`:
 
 ```markdown
-| Date | Type | Topic | Link |
-|------|------|-------|------|
-| 2026-01-28 | decision | Functional options pattern | [Entry](26-01-28.14-30-PST.lirt.functional-options-pattern.md) |
+<!-- With ambassador -->
+- [26-01-28] [Functional Options Pattern](./26-01-28.14-30-PST.Gastown.functional-options-pattern.md)
+
+<!-- Without ambassador -->
+- [26-01-28] [Functional Options Pattern](./26-01-28.14-30-PST.functional-options-pattern.md)
 ```
 
 ## Success Criteria
@@ -124,7 +141,7 @@ After creating entries, update `diary/_index.md`:
 - Each diary entry is comprehensive (preserves full context from bead)
 - Index updated with all new entries
 - Beads closed after processing
-- `bd ready --type chronicle` returns empty
+- `bd list --label chronicle --status open` returns empty
 
 ## Error Handling
 
