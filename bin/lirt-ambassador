@@ -1073,6 +1073,92 @@ cmd_create() {
     bd create "${bd_args[@]}" "${extra_args[@]}"
 }
 
+# Create a chronicle bead (diary-worthy moment)
+cmd_chronicle() {
+    local title="" category="insight" domain="" description=""
+    local extra_labels=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --title) title="$2"; shift 2 ;;
+            --category) category="$2"; shift 2 ;;
+            --domain) domain="$2"; shift 2 ;;
+            --description) description="$2"; shift 2 ;;
+            --label) extra_labels+=("$2"); shift 2 ;;
+            --auto-classify)
+                if [[ -n "$title" ]]; then
+                    domain=$(auto_classify_domain "$title" "$description")
+                fi
+                shift
+                ;;
+            *)
+                if [[ -z "$title" ]]; then
+                    title="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$title" ]]; then
+        echo "Usage: lirt-ambassador chronicle --title \"...\" [options]" >&2
+        echo ""
+        echo "Options:"
+        echo "  --title <text>       Chronicle title (required)"
+        echo "  --category <cat>     Category: decision, insight, pattern, correction, lesson (default: insight)"
+        echo "  --domain <domain>    Domain classification (or --auto-classify)"
+        echo "  --description <text> Full description of the chronicle-worthy moment"
+        echo "  --label <label>      Additional labels (can repeat)"
+        echo "  --auto-classify      Auto-detect domain from title"
+        echo ""
+        echo "Categories:"
+        echo "  decision    - Architectural or design choice with alternatives"
+        echo "  insight     - Realization that changed understanding"
+        echo "  pattern     - Recurring theme recognized"
+        echo "  correction  - Direction change and why"
+        echo "  lesson      - What worked/didn't and why"
+        exit 1
+    fi
+
+    # Ensure title starts with "Chronicle:" for visibility
+    if [[ ! "$title" =~ ^Chronicle: ]]; then
+        title="Chronicle: $title"
+    fi
+
+    # Auto-classify if domain not specified
+    if [[ -z "$domain" ]]; then
+        domain=$(auto_classify_domain "$title" "$description")
+        echo "Auto-classified domain: $domain"
+    fi
+
+    # Build labels
+    local labels="chronicle,$category,domain:$domain,ip:public"
+    for lbl in "${extra_labels[@]}"; do
+        labels="$labels,$lbl"
+    done
+
+    echo "Creating chronicle bead..."
+    echo "  Title: $title"
+    echo "  Category: $category"
+    echo "  Domain: $domain"
+
+    local bd_args=(
+        --title "$title"
+        --type task
+        --priority 3
+        --labels "$labels"
+    )
+
+    if [[ -n "$description" ]]; then
+        bd_args+=(--description "$description")
+    fi
+
+    bd create "${bd_args[@]}"
+
+    echo ""
+    echo "Run 'lirt-chronicler' to process chronicle beads into diary entries."
+}
+
 # Auto-classify domain based on keywords
 auto_classify_domain() {
     local title="$1"
@@ -1302,6 +1388,12 @@ BEAD CREATION (ENFORCED):
     --ip <scope>                   IP scope
     --auto                         Auto-classify from title
 
+  chronicle --title "..." [opts]   Create a chronicle bead (diary-worthy moment)
+    --category <cat>               decision, insight, pattern, correction, lesson
+    --domain <domain>              Domain classification
+    --description <text>           Full description
+    --auto-classify                Auto-detect domain from title
+
 ASSESSMENT & ROUTING:
   assess <issue-id> [--verbose]    Check if this gastown can handle an issue
   route <issue-id> [options]       Route issue to appropriate gastown
@@ -1354,6 +1446,7 @@ main() {
         assess) cmd_assess "$@" ;;
         route) cmd_route "$@" ;;
         create) cmd_create "$@" ;;
+        chronicle) cmd_chronicle "$@" ;;
         classify) cmd_classify "$@" ;;
         quarantine) cmd_quarantine "$@" ;;
         ready) cmd_ready "$@" ;;
