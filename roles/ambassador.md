@@ -1,22 +1,33 @@
-# Ambassador Protocol
+# Ambassador Protocol (v2)
 
-**Role**: Multi-gastown coordination and capability-based work routing
+**Role**: Multi-gastown coordination with capability and policy-based work routing
 **Applies to**: ALL agents working on lirt
 
 ## Purpose
 
-The Ambassador ensures that work is routed to gastowns capable of performing it. When a task has capability requirements (e.g., requires macOS, requires GPU), the ambassador protocol determines whether this gastown can handle it or should route it elsewhere.
+The Ambassador ensures that:
+1. **Work is routed** to gastowns capable of performing it (capability matching)
+2. **IP is protected** through domain and client isolation policies
+3. **Beads are qualified** with policy metadata at creation time
+4. **Approval workflows** gate sensitive or out-of-scope work
 
-This enables multiple gastowns (and multiple users) to collaborate on the same project without conflicts.
+This enables multiple gastowns (and multiple users) to collaborate on the same project with proper work routing and intellectual property isolation.
 
 ## Key Concepts
 
-### Town Identity
+### Town Identity (v2)
 
-Each gastown has a unique identifier stored in `.ambassador/town.json`. This ID is used for:
-- Diary entry filenames (attribution)
-- Bead assignee values (claim ownership)
-- Routing targets (explicit routing)
+Each gastown has:
+- **UUID**: Globally unique identifier (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+- **Alias**: Human-readable name (`hostname.overseer`, e.g., `mbp-m5.james`)
+
+The UUID is used for bead assignment (collision-proof). The alias is used for display and logs.
+
+```bash
+lirt-ambassador id      # Returns UUID
+lirt-ambassador alias   # Returns hostname.overseer
+lirt-ambassador whoami  # Full identity display
+```
 
 ### Capabilities
 
@@ -29,231 +40,295 @@ Gastowns declare what they can do:
 | Tools | go, node, docker, kubectl | Auto-detected |
 | Custom | gpu-access, vpn-access, admin | Manual |
 
-### Sync Branch
+### Capability Matching
 
-All gastowns sync beads through a dedicated branch (default: `beads-sync`) rather than main. This allows:
-- Parallel work without merge conflicts on main
-- Atomic claiming via `bd update --claim`
-- Independent bead state from code state
-
-## When to Assess Capability
-
-**Before starting ANY task**, the ambassador protocol applies:
-
-### Triggers for Assessment
-
-| Trigger | Example |
-|---------|---------|
-| Task has `requires:*` labels | `requires:darwin`, `requires:gpu` |
-| User explicitly requests routing | "Route this to the Linux box" |
-| Task mentions platform-specific work | "Fix the macOS build" |
-| Task requires tools not present | "Run the GPU benchmarks" |
-
-### Assessment Flow
-
-```
-1. Identify capability requirements from:
-   - Issue labels (requires:*)
-   - Task description keywords
-   - Explicit user instructions
-
-2. Compare against local capabilities:
-   lirt-ambassador assess <issue-id>
-
-3. Decision:
-   - All requirements met → Proceed with work
-   - Missing requirements → Route to capable gastown
-```
-
-## Routing Work
-
-When this gastown cannot handle a task, route it appropriately:
-
-### Route to Any Capable Gastown
-
-```bash
-# Add requirement label and release to pool
-lirt-ambassador route <issue-id> --capability darwin
-```
-
-This adds `requires:darwin` label and sets assignee to empty, allowing any gastown with the `darwin` capability to claim it.
-
-### Route to Specific Gastown
-
-```bash
-# Assign directly to another gastown
-lirt-ambassador route <issue-id> --to other-town-id
-```
-
-This sets the assignee to the specific gastown.
-
-### Create New Routed Bead
-
-If the task isn't already a bead, create one:
-
-```bash
-bd create --title "Task: [description]" \
-  --type task \
-  --priority 2 \
-  --add-label requires:darwin \
-  --add-label requires:gpu \
-  --description "[full context for the receiving gastown]"
-bd sync
-```
-
-## Claiming Work
-
-When looking for work, filter by capabilities:
-
-```bash
-# Find work this gastown can handle
-bd ready --unassigned --label requires:darwin
-bd ready --unassigned --label requires:arm64
-
-# Claim atomically (double-sync pattern)
-bd sync
-bd update <issue-id> --claim
-bd sync
-```
-
-## Capability Matching
-
-### Issue Labels → Required Capabilities
+Beads can specify both **required** and **excluded** capabilities:
 
 | Label | Meaning |
 |-------|---------|
-| `requires:darwin` | Must run on macOS |
-| `requires:linux` | Must run on Linux |
-| `requires:arm64` | Must run on ARM64 architecture |
-| `requires:go` | Needs Go toolchain |
-| `requires:docker` | Needs Docker |
-| `requires:gpu` | Needs GPU access |
-| `requires:admin` | Needs admin/sudo access |
+| `requires:darwin` | Gastown MUST have darwin |
+| `requires:gpu` | Gastown MUST have gpu |
+| `excludes:windows` | Gastown MUST NOT have windows |
+| `excludes:gpu` | Gastown MUST NOT have gpu |
 
-### Adding Requirements to Issues
+Example: Deterministic tests might use `excludes:gpu` to ensure reproducibility.
 
-When creating or updating issues that have specific requirements:
+### Policy System
 
-```bash
-bd update <issue-id> --add-label requires:darwin
-bd update <issue-id> --add-label requires:docker
-bd sync
-```
-
-## Conflict Prevention
-
-### The Double-Sync Pattern
-
-Always sync before AND after claiming:
+Gastowns can configure policies for domain and IP isolation:
 
 ```bash
-bd sync                    # Pull latest state
-bd update <id> --claim     # Atomic claim
-bd sync                    # Push immediately
+# Domain policies
+lirt-ambassador policy set-domain allowed general-programming
+lirt-ambassador policy set-domain restricted competitor-code
+lirt-ambassador policy set-domain requires_approval external-api-access
+
+# IP isolation
+lirt-ambassador policy set-ip-client acme-corp --exclusive
 ```
 
-This ensures:
-1. You see if someone else already claimed it
-2. Your claim is visible to other gastowns immediately
+**Domain Categories:**
+- `allowed`: Work in these domains proceeds automatically
+- `restricted`: Work in these domains is rejected (routed elsewhere)
+- `requires_approval`: Work requires overseer approval before proceeding
 
-### Handling Claim Conflicts
+**IP Isolation:**
+- `client_projects`: List of client identifiers this gastown can work on
+- `exclusive`: If true, gastown ONLY works on listed clients (and rejects others)
 
-If `bd update --claim` fails (someone else claimed first):
+## Bead Creation Enforcement
+
+**CRITICAL**: All beads must have policy classification. Use `ambassador create` instead of `bd create`.
+
+### Creating Policy-Qualified Beads
 
 ```bash
-# Find other available work
-bd ready --unassigned --label requires:darwin
+# Explicit classification
+lirt-ambassador create \
+  --title "Fix authentication bug" \
+  --type bug \
+  --domain identity-management \
+  --ip public
 
-# Or check who claimed it
-bd show <issue-id>
+# Auto-classification from title
+lirt-ambassador create \
+  --title "Fix authentication bug" \
+  --auto-classify
 ```
 
-## Stale Claim Detection
+### Required Labels
 
-Periodically check for abandoned work:
+Every bead MUST have:
+- `domain:<topic>` - What topic area (e.g., `domain:identity-management`)
+- `ip:<scope>` - IP context (e.g., `ip:public` or `ip:acme-corp`)
+
+### Classifying Existing Beads
 
 ```bash
-# Find in-progress issues with no updates for 1+ day
-bd stale --status in_progress --days 1
+# Manual classification
+lirt-ambassador classify <issue-id> --domain testing --ip public
+
+# Auto-classification
+lirt-ambassador classify <issue-id> --auto
 ```
 
-If found:
-1. Check with the claiming gastown if possible
-2. If unresponsive, release: `bd update <id> --status open --assignee ""`
-3. Re-claim if needed
+### Quarantine
 
-## Self-Check Before Working
+Beads without policy classification are quarantined and cannot be claimed:
 
-Before starting any task:
+```bash
+# List quarantined beads
+lirt-ambassador quarantine
 
-1. **Check requirements**: `lirt-ambassador assess <issue-id>`
-2. **If capable**: Proceed with `bd update <id> --claim && bd sync`
-3. **If not capable**: Route with `lirt-ambassador route <id> --capability <needed>`
+# Only policy-qualified beads appear in ready list
+lirt-ambassador ready
+```
+
+## Assessment Flow
+
+Before starting ANY task, run assessment:
+
+```bash
+lirt-ambassador assess <issue-id>
+```
+
+### Assessment Phases
+
+```
+1. POLICY CLASSIFICATION CHECK
+   └─ Does bead have domain: label?
+      ├─ No → QUARANTINED (exit 2)
+      └─ Yes → Continue
+
+2. CAPABILITY CHECK (requires:)
+   └─ Does gastown have all required capabilities?
+      ├─ No → ROUTE (exit 1)
+      └─ Yes → Continue
+
+3. CAPABILITY CHECK (excludes:)
+   └─ Does gastown have any excluded capabilities?
+      ├─ Yes → ROUTE (exit 1)
+      └─ No → Continue
+
+4. DOMAIN POLICY CHECK
+   └─ Is task domain in gastown's policy?
+      ├─ Restricted → REJECT (exit 4)
+      ├─ Requires approval (not granted) → HOLD (exit 3)
+      └─ Allowed or empty policy → Continue
+
+5. IP ISOLATION CHECK
+   └─ Does task IP scope match gastown's client list?
+      ├─ Exclusive mode + no match → ROUTE (exit 1)
+      └─ Match or non-exclusive → PROCEED (exit 0)
+```
+
+### Exit Codes
+
+| Code | Meaning | Action |
+|------|---------|--------|
+| 0 | CAN HANDLE | Proceed with work |
+| 1 | CANNOT HANDLE | Route to other gastown |
+| 2 | QUARANTINED | Classify bead first |
+| 3 | HOLD | Await overseer approval |
+| 4 | REJECTED | Policy violation, cannot run here |
+
+## Routing Work
+
+When this gastown cannot handle a task:
+
+```bash
+# Route to any capable gastown
+lirt-ambassador route <issue-id> --capability darwin
+
+# Route to specific gastown (by UUID)
+lirt-ambassador route <issue-id> --to <uuid>
+
+# Add reason for audit trail
+lirt-ambassador route <issue-id> --capability linux \
+  --reason "IP isolation: acme-corp"
+```
+
+## Approval Workflow
+
+For tasks requiring approval:
+
+```bash
+# List pending approvals
+lirt-ambassador approvals
+
+# Grant approval
+lirt-ambassador approve <issue-id>
+
+# Deny and route elsewhere
+lirt-ambassador deny <issue-id> --route
+
+# Deny and ban from this gastown
+lirt-ambassador deny <issue-id> --ban
+```
+
+## Agent Protocol
+
+### Before Creating Any Bead
+
+1. Determine domain classification from task context
+2. Determine IP scope (public or client-specific)
+3. Use `lirt-ambassador create` with classification
+
+### Before Starting Any Task
+
+1. Run `lirt-ambassador assess <issue-id>`
+2. Check exit code:
+   - 0: Proceed with `bd update <id> --claim && bd sync`
+   - 1: Route with `lirt-ambassador route <id>`
+   - 2: Classify with `lirt-ambassador classify <id>`
+   - 3: Wait for approval or escalate to overseer
+   - 4: Do not attempt, work is prohibited here
+
+### Bead-Creating Roles
+
+Roles that create beads (chronicler, archivist, etc.) MUST:
+- Use `lirt-ambassador create` instead of `bd create`
+- Include domain classification based on detected work
+- Default to `ip:public` unless task is client-specific
 
 ## Example Scenarios
 
-### Scenario 1: macOS-Only Task on Linux Gastown
+### Scenario 1: Capability Exclusion
 
 ```
-Task: "Fix the macOS notarization script"
-Labels: requires:darwin
+Task: "Run deterministic ML tests"
+Labels: requires:python3, excludes:gpu
 
-Linux gastown assessment:
-  ✗ darwin (missing)
+Gastown A (has gpu):
+  + python3
+  ! gpu (PRESENT - violates exclusion)
+  → ROUTE
 
-Action: Route to macOS gastown
-  lirt-ambassador route issue-123 --capability darwin
+Gastown B (no gpu):
+  + python3
+  - gpu (absent, ok)
+  → CAN HANDLE
 ```
 
-### Scenario 2: Multi-Requirement Task
+### Scenario 2: Domain Policy
 
 ```
-Task: "Run GPU benchmarks on ARM64"
-Labels: requires:arm64, requires:gpu
+Task: "Integrate Stripe payment API"
+Labels: domain:external-api-access, ip:public
 
-M1 Mac gastown assessment:
-  ✓ arm64
-  ✗ gpu (missing)
+Gastown policy:
+  allowed: [general-programming, devops]
+  requires_approval: [external-api-access]
 
-Action: Route to gastown with both capabilities
-  Already has requires:arm64, already has requires:gpu
-  bd update issue-456 --assignee "" --status open
-  bd sync
-  # Wait for capable gastown to claim
+Assessment:
+  Domain requires approval
+  → HOLD (exit 3)
+
+Overseer runs: lirt-ambassador approve <id>
+  → CAN HANDLE
 ```
 
-### Scenario 3: No Special Requirements
+### Scenario 3: IP Isolation
 
 ```
-Task: "Update README documentation"
-Labels: (none with requires:)
+Task: "Fix client auth bug"
+Labels: domain:identity-management, ip:acme-corp
 
-Any gastown assessment:
-  No requirements to check
+Gastown A (exclusive, clients: [acme-corp]):
+  IP acme-corp in client list
+  → CAN HANDLE
 
-Action: Claim and proceed
-  bd sync && bd update issue-789 --claim && bd sync
+Gastown B (exclusive, clients: [initech]):
+  IP acme-corp NOT in client list
+  → ROUTE (IP isolation)
+```
+
+### Scenario 4: Quarantined Bead
+
+```
+Task: "Fix bug in login flow"
+Labels: (none)
+
+Assessment:
+  Missing domain: label
+  → QUARANTINED (exit 2)
+
+Action:
+  lirt-ambassador classify <id> --domain identity-management
+  → Re-assess
 ```
 
 ## Tools Reference
 
-| Tool | Purpose |
-|------|---------|
-| `lirt-ambassador init` | Initialize gastown |
-| `lirt-ambassador status` | Show gastown status |
+| Command | Purpose |
+|---------|---------|
+| `lirt-ambassador init` | Initialize gastown with UUID |
+| `lirt-ambassador migrate` | Migrate v1 config to v2 |
+| `lirt-ambassador id` | Get town UUID |
+| `lirt-ambassador alias` | Get town alias |
+| `lirt-ambassador whoami` | Full identity display |
 | `lirt-ambassador caps list` | List capabilities |
 | `lirt-ambassador caps add <cap>` | Add capability |
-| `lirt-ambassador assess <id>` | Check if can handle issue |
+| `lirt-ambassador policy show` | Show policies |
+| `lirt-ambassador policy set-domain` | Configure domain policy |
+| `lirt-ambassador policy set-ip-client` | Configure IP isolation |
+| `lirt-ambassador create` | Create policy-qualified bead |
+| `lirt-ambassador classify <id>` | Add policy classification |
+| `lirt-ambassador assess <id>` | Check if can handle |
 | `lirt-ambassador route <id>` | Route to capable gastown |
-| `bd update <id> --claim` | Atomically claim issue |
-| `bd ready --unassigned` | Find available work |
-| `bd stale --status in_progress` | Find abandoned work |
-| `bd sync` | Synchronize with remote |
+| `lirt-ambassador ready` | List qualified ready work |
+| `lirt-ambassador quarantine` | List unclassified beads |
+| `lirt-ambassador approvals` | List pending approvals |
+| `lirt-ambassador approve <id>` | Grant approval |
+| `lirt-ambassador deny <id>` | Deny approval |
+| `lirt-ambassador status` | Show gastown status |
+| `lirt-ambassador sync-setup` | Set up sync branch |
 
 ## Success Metrics
 
 Track ambassador effectiveness:
-- Tasks routed vs tasks attempted locally
+- Beads created with vs without policy classification
+- Tasks routed due to capability vs policy reasons
+- Approval requests granted vs denied
+- IP isolation violations caught
 - Time from task creation to capable gastown claiming
-- Claim conflicts (should approach zero)
-- Stale claims requiring intervention

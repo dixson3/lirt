@@ -1,12 +1,32 @@
 {
-  "id": "lirt-{{hostname}}",
+  "id": null,
+  "alias": null,
+  "overseer": null,
+  "hostname": null,
   "capabilities": {
     "os": "auto-detect",
     "arch": "auto-detect",
     "tools": [],
     "custom": []
   },
+  "policies": {
+    "domains": {
+      "allowed": [],
+      "restricted": [],
+      "requires_approval": []
+    },
+    "ip_isolation": {
+      "client_projects": [],
+      "exclusive": false
+    },
+    "routing": {
+      "on_policy_reject": "route-to-capable",
+      "on_approval_timeout": "hold",
+      "fallback_gastowns": []
+    }
+  },
   "sync_branch": "beads-sync",
+  "created_at": null,
   "initialized": null,
   "_comment": "This is a template. Run lirt-ambassador init to generate actual config."
 }
