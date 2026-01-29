@@ -1046,7 +1046,7 @@ cmd_create() {
         --title "$title"
         --type "$type"
         --priority "$priority"
-        --add-label "$labels"
+        --labels "$labels"
     )
 
     if [[ -n "$description" ]]; then
