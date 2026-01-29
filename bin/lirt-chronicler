@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# lirt-chronicler - Process chronicle beads into diary entries
+#
+# Invokes the chronicler agent to batch-process open chronicle beads.
+# See .claude/agents/chronicler.md for the agent definition.
+# See roles/chronicler.md for the detection protocol.
+
+set -euo pipefail
+
+# Find lirt root
+find_lirt_root() {
+    local dir="$PWD"
+    while [[ "$dir" != "/" ]]; do
+        if [[ -d "$dir/diary" && -f "$dir/AGENTS.md" ]]; then
+            echo "$dir"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+LIRT_ROOT=$(find_lirt_root) || {
+    echo "Error: Not in a lirt workspace (no diary/ found)"
+    exit 1
+}
+
+cd "$LIRT_ROOT"
+
+# Check for open chronicle beads first
+OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null || true)
+
+if [[ -z "$OPEN_BEADS" ]]; then
+    echo "No open chronicle beads to process."
+    exit 0
+fi
+
+echo "Found open chronicle beads:"
+echo "$OPEN_BEADS"
+echo ""
+echo "Processing with chronicler agent..."
+echo ""
+
+# Invoke the chronicler agent
+# The agent will:
+# 1. Read all open chronicle beads
+# 2. Create diary entries
+# 3. Update diary/_index.md
+# 4. Close processed beads
+claude --agent chronicler --print "Process all open chronicle beads into diary entries. Query with 'bd ready --type chronicle', create diary entries in diary/, update diary/_index.md, and close processed beads with 'bd close <id>'."
