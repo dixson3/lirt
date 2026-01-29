@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Chronicle Review:\\n\\n1. Chronicle-worthy? (new capability, decision, insight, pattern, Go/GraphQL lessons?)\\n   → If yes: Create chronicle bead IMMEDIATELY (bd create --type chronicle ...)\\n\\n2. See roles/chronicler.md for the detection protocol and rich description template.\\n\\nDo NOT proceed until you have reviewed ALL session work for chronicle-worthy items.\\n\""
+            "command": "echo \"\\n⚠️  BEFORE COMPACTION - Chronicle & Archive Review:\\n\\n1. Chronicle-worthy? (insights, patterns, Go idioms, lessons learned)\\n   → If yes: Create chronicle bead (bd create --type chronicle ...)\\n\\n2. Research conducted? (web searches, docs referenced, tools evaluated)\\n   → If yes: Create archive bead (bd create --type archive --add-label research ...)\\n\\n3. Decision made? (architecture, tooling, process, scope change)\\n   → If yes: Create archive bead (bd create --type archive --add-label decision ...)\\n\\nSee roles/chronicler.md and roles/archivist.md for detection protocols.\\nDo NOT proceed until you have reviewed ALL session work.\\n\""
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"\\n⚠️  PRE-PUSH CHRONICLE GATE\\n\\nReview ALL commits being pushed:\\n\\n□ Chronicle-worthy? (new capability, decision, insight, Go patterns, GraphQL design?)\\n  → If yes: Create chronicle bead BEFORE pushing (bd create --type chronicle ...)\\n\\n□ Open chronicle beads? Run: bd ready --type chronicle\\n  → If not empty: Process with lirt-chronicler BEFORE pushing\\n\\nSTOP and create beads before pushing if anything was missed.\\n\""
+            "command": "echo \"\\n⚠️  PRE-PUSH CHRONICLE & ARCHIVE GATE\\n\\nReview ALL commits being pushed:\\n\\n□ Chronicle-worthy? (insights, patterns, Go idioms, lessons)\\n  → If yes: Create chronicle bead BEFORE pushing\\n\\n□ Research conducted? (external sources, investigations)\\n  → If yes: Create archive bead --add-label research\\n\\n□ Decision made? (strategic choices, architecture)\\n  → If yes: Create archive bead --add-label decision\\n\\n□ Open beads? Run: bd ready --type chronicle && bd ready --type archive\\n  → Process with lirt-chronicler / lirt-archivist BEFORE pushing\\n\\nSTOP and create beads before pushing if anything was missed.\\n\""
           }
         ]
       }
