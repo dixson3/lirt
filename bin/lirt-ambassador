@@ -729,10 +729,15 @@ cmd_assess() {
 
     # Get issue details
     local issue_json
-    issue_json=$(bd show "$issue_id" --format json 2>/dev/null) || {
+    issue_json=$(bd show "$issue_id" --json 2>/dev/null | jq '.[0]') || {
         echo "Error: Could not find issue $issue_id" >&2
         exit 1
     }
+
+    if [[ -z "$issue_json" || "$issue_json" == "null" ]]; then
+        echo "Error: Could not find issue $issue_id" >&2
+        exit 1
+    fi
 
     local title
     title=$(echo "$issue_json" | jq -r '.title // "untitled"')
@@ -746,8 +751,16 @@ cmd_assess() {
 
     # === PHASE 1: POLICY CLASSIFICATION CHECK ===
     local has_domain has_ip
-    has_domain=$(echo "$issue_json" | jq -e '.labels[]? | select(startswith("domain:"))' 2>/dev/null && echo "true" || echo "false")
-    has_ip=$(echo "$issue_json" | jq -e '.labels[]? | select(startswith("ip:"))' 2>/dev/null && echo "true" || echo "false")
+    if echo "$issue_json" | jq -e '.labels[]? | select(startswith("domain:"))' >/dev/null 2>&1; then
+        has_domain="true"
+    else
+        has_domain="false"
+    fi
+    if echo "$issue_json" | jq -e '.labels[]? | select(startswith("ip:"))' >/dev/null 2>&1; then
+        has_ip="true"
+    else
+        has_ip="false"
+    fi
 
     if [[ "$has_domain" != "true" ]]; then
         echo "QUARANTINED: Missing domain classification"
@@ -835,7 +848,11 @@ cmd_assess() {
             elif [[ "$in_approval" == "true" ]]; then
                 # Check if already approved
                 local is_approved
-                is_approved=$(echo "$issue_json" | jq -e '.labels[]? | select(. == "approval:granted")' 2>/dev/null && echo "true" || echo "false")
+                if echo "$issue_json" | jq -e '.labels[]? | select(. == "approval:granted")' >/dev/null 2>&1; then
+                    is_approved="true"
+                else
+                    is_approved="false"
+                fi
                 if [[ "$is_approved" == "true" ]]; then
                     echo "  Status: APPROVED"
                 else
@@ -1097,7 +1114,7 @@ cmd_classify() {
             --auto)
                 # Get issue title for auto-classification
                 local title
-                title=$(bd show "$issue_id" --format json 2>/dev/null | jq -r '.title // ""')
+                title=$(bd show "$issue_id" --json 2>/dev/null | jq -r '.[0].title // ""')
                 domain=$(auto_classify_domain "$title" "")
                 echo "Auto-classified domain: $domain"
                 shift
@@ -1165,7 +1182,7 @@ cmd_quarantine() {
         [[ -z "$id" ]] && continue
 
         local has_domain
-        has_domain=$(bd show "$id" --format json 2>/dev/null | jq -e '.labels[]? | select(startswith("domain:"))' 2>/dev/null && echo "true" || echo "false")
+        has_domain=$(bd show "$id" --json 2>/dev/null | jq -e '.[0].labels[]? | select(startswith("domain:"))' 2>/dev/null && echo "true" || echo "false")
 
         if [[ "$has_domain" != "true" ]]; then
             echo "$line"
