@@ -1,0 +1,12 @@
+{
+  "id": "lirt-{{hostname}}",
+  "capabilities": {
+    "os": "auto-detect",
+    "arch": "auto-detect",
+    "tools": [],
+    "custom": []
+  },
+  "sync_branch": "beads-sync",
+  "initialized": null,
+  "_comment": "This is a template. Run lirt-ambassador init to generate actual config."
+}

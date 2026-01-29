@@ -1,0 +1,586 @@
+#!/usr/bin/env bash
+# lirt-ambassador - Multi-gastown coordination
+#
+# Usage: lirt-ambassador <command> [args]
+#
+# Commands:
+#   init              Initialize this gastown (ID, capabilities, sync branch)
+#   id [get|set <id>] Get or set town identifier
+#   caps <subcommand> Manage capabilities (list, add, remove)
+#   status            Show current gastown status
+#   assess <issue>    Check if this gastown can handle an issue
+#   route <issue>     Route issue to appropriate gastown
+#   sync-setup        Set up the beads sync branch
+
+set -euo pipefail
+
+# Find the current git project root (for sync branch operations)
+find_git_root() {
+    git rev-parse --show-toplevel 2>/dev/null || {
+        echo "Error: Not in a git repository" >&2
+        return 1
+    }
+}
+
+# Gas Town root (for shared town config)
+# Uses GT_ROOT if set, otherwise falls back to git root
+GASTOWN_ROOT="${GT_ROOT:-}"
+if [[ -z "$GASTOWN_ROOT" ]]; then
+    GASTOWN_ROOT=$(find_git_root) || exit 1
+fi
+
+# Project root (current git repo - for sync branch)
+PROJECT_ROOT=$(find_git_root) || exit 1
+
+# Ambassador config is at Gas Town level (shared across projects)
+AMBASSADOR_DIR="$GASTOWN_ROOT/.ambassador"
+TOWN_CONFIG="$AMBASSADOR_DIR/town.json"
+SYNC_BRANCH="${AMBASSADOR_SYNC_BRANCH:-beads-sync}"
+
+# Ensure jq is available
+check_deps() {
+    if ! command -v jq &> /dev/null; then
+        echo "Error: jq is required. Install with: brew install jq" >&2
+        exit 1
+    fi
+}
+
+# Resolve town ID using priority chain
+resolve_town_id() {
+    # 1. Explicit config
+    if [[ -f "$TOWN_CONFIG" ]]; then
+        local id
+        id=$(jq -r '.id // empty' "$TOWN_CONFIG" 2>/dev/null)
+        if [[ -n "$id" ]]; then
+            echo "$id"
+            return 0
+        fi
+    fi
+
+    # 2. Legacy .lirt/town-id file
+    if [[ -f "$PROJECT_ROOT/.lirt/town-id" ]]; then
+        cat "$PROJECT_ROOT/.lirt/town-id"
+        return 0
+    fi
+
+    # 3. mayor/town.json name field
+    if [[ -f "$PROJECT_ROOT/mayor/town.json" ]]; then
+        local name
+        name=$(jq -r '.name // empty' "$PROJECT_ROOT/mayor/town.json" 2>/dev/null)
+        if [[ -n "$name" ]]; then
+            echo "$name"
+            return 0
+        fi
+    fi
+
+    # 4. Git remote basename (strip gastown- prefix)
+    local remote_url
+    remote_url=$(git -C "$PROJECT_ROOT" remote get-url origin 2>/dev/null || true)
+    if [[ -n "$remote_url" ]]; then
+        local basename
+        basename=$(echo "$remote_url" | xargs basename 2>/dev/null | sed 's/\.git$//' | sed 's/^gastown-//')
+        if [[ -n "$basename" ]]; then
+            echo "$basename"
+            return 0
+        fi
+    fi
+
+    # 5. Directory name + hostname fallback
+    echo "$(basename "$PROJECT_ROOT")-$(hostname -s)"
+}
+
+# Detect OS capability
+detect_os() {
+    case "$(uname -s)" in
+        Darwin) echo "darwin" ;;
+        Linux) echo "linux" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# Detect architecture capability
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64) echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
+        armv7l) echo "arm" ;;
+        *) echo "$(uname -m)" ;;
+    esac
+}
+
+# Initialize town configuration
+cmd_init() {
+    local force=false
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force|-f) force=true; shift ;;
+            *) echo "Unknown option: $1" >&2; exit 1 ;;
+        esac
+    done
+
+    if [[ -f "$TOWN_CONFIG" && "$force" != "true" ]]; then
+        echo "Town already initialized. Use --force to reinitialize."
+        echo ""
+        cmd_status
+        return 0
+    fi
+
+    echo "Initializing gastown..."
+    echo ""
+
+    mkdir -p "$AMBASSADOR_DIR"
+
+    # Resolve town ID
+    local town_id
+    town_id=$(resolve_town_id)
+    echo "Town ID: $town_id"
+
+    # Detect capabilities
+    local os arch
+    os=$(detect_os)
+    arch=$(detect_arch)
+    echo "Detected OS: $os"
+    echo "Detected Arch: $arch"
+
+    # Detect common tools
+    local tools=()
+    for tool in go node python3 rust cargo docker kubectl; do
+        if command -v "$tool" &> /dev/null; then
+            tools+=("\"$tool\"")
+        fi
+    done
+    local tools_json
+    tools_json=$(IFS=,; echo "[${tools[*]}]")
+    echo "Detected Tools: ${tools[*]:-none}"
+
+    # Create config
+    cat > "$TOWN_CONFIG" << EOF
+{
+  "id": "$town_id",
+  "capabilities": {
+    "os": "$os",
+    "arch": "$arch",
+    "tools": $tools_json,
+    "custom": []
+  },
+  "sync_branch": "$SYNC_BRANCH",
+  "initialized": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+
+    echo ""
+    echo "Created: $TOWN_CONFIG"
+
+    # Set up sync branch
+    echo ""
+    cmd_sync_setup
+
+    echo ""
+    echo "✓ Gastown initialized successfully"
+    echo ""
+    echo "Next steps:"
+    echo "  - Add custom capabilities: lirt-ambassador caps add <cap>"
+    echo "  - Check status: lirt-ambassador status"
+}
+
+# Get or set town ID
+cmd_id() {
+    local subcmd="${1:-get}"
+    shift || true
+
+    case "$subcmd" in
+        get)
+            resolve_town_id
+            ;;
+        set)
+            if [[ -z "${1:-}" ]]; then
+                echo "Usage: lirt-ambassador id set <id>" >&2
+                exit 1
+            fi
+            mkdir -p "$AMBASSADOR_DIR"
+            if [[ -f "$TOWN_CONFIG" ]]; then
+                local tmp
+                tmp=$(jq --arg id "$1" '.id = $id' "$TOWN_CONFIG")
+                echo "$tmp" > "$TOWN_CONFIG"
+            else
+                echo "{\"id\": \"$1\"}" > "$TOWN_CONFIG"
+            fi
+            echo "Town ID set to: $1"
+            ;;
+        *)
+            echo "Usage: lirt-ambassador id [get|set <id>]" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Manage capabilities
+cmd_caps() {
+    local subcmd="${1:-list}"
+    shift || true
+
+    case "$subcmd" in
+        list)
+            if [[ ! -f "$TOWN_CONFIG" ]]; then
+                echo "Town not initialized. Run: lirt-ambassador init" >&2
+                exit 1
+            fi
+            echo "Capabilities for $(jq -r '.id' "$TOWN_CONFIG"):"
+            echo ""
+            echo "OS:    $(jq -r '.capabilities.os // "not set"' "$TOWN_CONFIG")"
+            echo "Arch:  $(jq -r '.capabilities.arch // "not set"' "$TOWN_CONFIG")"
+            echo "Tools: $(jq -r '.capabilities.tools | join(", ")' "$TOWN_CONFIG")"
+            echo "Custom: $(jq -r '.capabilities.custom | join(", ")' "$TOWN_CONFIG")"
+            ;;
+        add)
+            if [[ -z "${1:-}" ]]; then
+                echo "Usage: lirt-ambassador caps add <capability>" >&2
+                exit 1
+            fi
+            if [[ ! -f "$TOWN_CONFIG" ]]; then
+                echo "Town not initialized. Run: lirt-ambassador init" >&2
+                exit 1
+            fi
+            local cap="$1"
+            local tmp
+            tmp=$(jq --arg cap "$cap" '.capabilities.custom += [$cap] | .capabilities.custom |= unique' "$TOWN_CONFIG")
+            echo "$tmp" > "$TOWN_CONFIG"
+            echo "Added capability: $cap"
+            ;;
+        remove)
+            if [[ -z "${1:-}" ]]; then
+                echo "Usage: lirt-ambassador caps remove <capability>" >&2
+                exit 1
+            fi
+            if [[ ! -f "$TOWN_CONFIG" ]]; then
+                echo "Town not initialized. Run: lirt-ambassador init" >&2
+                exit 1
+            fi
+            local cap="$1"
+            local tmp
+            tmp=$(jq --arg cap "$cap" '.capabilities.custom -= [$cap]' "$TOWN_CONFIG")
+            echo "$tmp" > "$TOWN_CONFIG"
+            echo "Removed capability: $cap"
+            ;;
+        *)
+            echo "Usage: lirt-ambassador caps [list|add|remove] [capability]" >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Show gastown status
+cmd_status() {
+    if [[ ! -f "$TOWN_CONFIG" ]]; then
+        echo "Town not initialized."
+        echo "Run: lirt-ambassador init"
+        exit 1
+    fi
+
+    echo "Gastown Status"
+    echo "=============="
+    echo ""
+    echo "ID:          $(jq -r '.id' "$TOWN_CONFIG")"
+    echo "Initialized: $(jq -r '.initialized // "unknown"' "$TOWN_CONFIG")"
+    echo "Config:      $TOWN_CONFIG"
+    echo ""
+    echo "Capabilities:"
+    echo "  OS:     $(jq -r '.capabilities.os // "not set"' "$TOWN_CONFIG")"
+    echo "  Arch:   $(jq -r '.capabilities.arch // "not set"' "$TOWN_CONFIG")"
+    echo "  Tools:  $(jq -r '.capabilities.tools | join(", ")' "$TOWN_CONFIG")"
+    echo "  Custom: $(jq -r '.capabilities.custom | join(", ")' "$TOWN_CONFIG")"
+    echo ""
+
+    # Check sync branch status (in current project's git repo)
+    echo "Project:     $PROJECT_ROOT"
+    local sync_branch
+    sync_branch=$(jq -r '.sync_branch // "beads-sync"' "$TOWN_CONFIG")
+    echo "Sync Branch: $sync_branch"
+
+    cd "$PROJECT_ROOT"
+    if git rev-parse --verify "$sync_branch" &>/dev/null; then
+        echo "  Local:   ✓ exists"
+    else
+        echo "  Local:   ✗ not found"
+    fi
+
+    if git ls-remote --heads origin "$sync_branch" 2>/dev/null | grep -q "$sync_branch"; then
+        echo "  Remote:  ✓ exists on origin"
+    else
+        echo "  Remote:  ✗ not found on origin"
+    fi
+}
+
+# Set up beads sync branch (in current project's git repo)
+cmd_sync_setup() {
+    echo "Setting up sync branch: $SYNC_BRANCH"
+    echo "  Project: $PROJECT_ROOT"
+
+    cd "$PROJECT_ROOT"
+
+    # Check if branch exists locally
+    if git rev-parse --verify "$SYNC_BRANCH" &>/dev/null; then
+        echo "  Local branch exists"
+    else
+        # Check if it exists on remote
+        if git ls-remote --heads origin "$SYNC_BRANCH" 2>/dev/null | grep -q "$SYNC_BRANCH"; then
+            echo "  Fetching from remote..."
+            git fetch origin "$SYNC_BRANCH:$SYNC_BRANCH"
+        else
+            echo "  Creating new branch..."
+            # Save current branch to return to
+            local current_branch
+            current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+
+            # Create orphan branch for beads sync
+            git checkout --orphan "$SYNC_BRANCH"
+            git reset --hard
+            echo "# Beads Sync Branch" > README.md
+            echo "" >> README.md
+            echo "This branch is used for beads synchronization across gastowns." >> README.md
+            echo "Do not merge this branch into main." >> README.md
+            git add README.md
+            git commit -m "Initialize beads sync branch"
+            git checkout "$current_branch" 2>/dev/null || git checkout main 2>/dev/null || true
+            echo "  Created local branch"
+        fi
+    fi
+
+    # Push to remote if not there
+    if ! git ls-remote --heads origin "$SYNC_BRANCH" 2>/dev/null | grep -q "$SYNC_BRANCH"; then
+        echo "  Pushing to remote..."
+        git push -u origin "$SYNC_BRANCH"
+    fi
+
+    # Configure beads to use sync branch (if bd supports it)
+    if command -v bd &> /dev/null; then
+        # Check if bd has sync branch config
+        if bd config get sync_branch &>/dev/null 2>&1; then
+            bd config set sync_branch "$SYNC_BRANCH" 2>/dev/null || true
+            echo "  Configured beads sync branch"
+        fi
+    fi
+
+    echo "  ✓ Sync branch ready"
+}
+
+# Assess if this gastown can handle an issue
+cmd_assess() {
+    local issue_id="${1:-}"
+
+    if [[ -z "$issue_id" ]]; then
+        echo "Usage: lirt-ambassador assess <issue-id>" >&2
+        exit 1
+    fi
+
+    if [[ ! -f "$TOWN_CONFIG" ]]; then
+        echo "Town not initialized. Run: lirt-ambassador init" >&2
+        exit 1
+    fi
+
+    # Get issue details
+    local issue_json
+    issue_json=$(bd show "$issue_id" --format json 2>/dev/null) || {
+        echo "Error: Could not find issue $issue_id" >&2
+        exit 1
+    }
+
+    # Extract requires:* labels
+    local required_caps
+    required_caps=$(echo "$issue_json" | jq -r '.labels[]? | select(startswith("requires:")) | sub("requires:"; "")' 2>/dev/null | sort -u)
+
+    if [[ -z "$required_caps" ]]; then
+        echo "Issue $issue_id has no capability requirements"
+        echo "Result: ✓ CAN HANDLE"
+        exit 0
+    fi
+
+    echo "Issue: $issue_id"
+    echo "Required capabilities:"
+
+    # Check each requirement
+    local can_handle=true
+    local missing=()
+
+    while IFS= read -r req; do
+        [[ -z "$req" ]] && continue
+
+        local has_cap=false
+
+        # Check OS
+        local my_os
+        my_os=$(jq -r '.capabilities.os // ""' "$TOWN_CONFIG")
+        if [[ "$req" == "$my_os" ]]; then
+            has_cap=true
+        fi
+
+        # Check arch
+        local my_arch
+        my_arch=$(jq -r '.capabilities.arch // ""' "$TOWN_CONFIG")
+        if [[ "$req" == "$my_arch" ]]; then
+            has_cap=true
+        fi
+
+        # Check tools
+        if jq -e --arg req "$req" '.capabilities.tools | index($req)' "$TOWN_CONFIG" &>/dev/null; then
+            has_cap=true
+        fi
+
+        # Check custom
+        if jq -e --arg req "$req" '.capabilities.custom | index($req)' "$TOWN_CONFIG" &>/dev/null; then
+            has_cap=true
+        fi
+
+        if [[ "$has_cap" == "true" ]]; then
+            echo "  ✓ $req"
+        else
+            echo "  ✗ $req (missing)"
+            can_handle=false
+            missing+=("$req")
+        fi
+    done <<< "$required_caps"
+
+    echo ""
+    if [[ "$can_handle" == "true" ]]; then
+        echo "Result: ✓ CAN HANDLE"
+        exit 0
+    else
+        echo "Result: ✗ CANNOT HANDLE"
+        echo ""
+        echo "Missing capabilities: ${missing[*]}"
+        echo ""
+        echo "Options:"
+        echo "  1. Add capability: lirt-ambassador caps add ${missing[0]}"
+        echo "  2. Route to capable gastown: lirt-ambassador route $issue_id"
+        exit 1
+    fi
+}
+
+# Route issue to appropriate gastown
+cmd_route() {
+    local issue_id=""
+    local target_town=""
+    local target_cap=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --to) target_town="$2"; shift 2 ;;
+            --capability|--cap) target_cap="$2"; shift 2 ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                if [[ -z "$issue_id" ]]; then
+                    issue_id="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$issue_id" ]]; then
+        echo "Usage: lirt-ambassador route <issue-id> [--to <town-id>] [--capability <cap>]" >&2
+        exit 1
+    fi
+
+    echo "Routing issue: $issue_id"
+
+    if [[ -n "$target_town" ]]; then
+        # Route to specific town
+        echo "  Target: $target_town"
+        bd update "$issue_id" --assignee "$target_town" --status open
+        bd sync
+        echo "  ✓ Routed to $target_town"
+    elif [[ -n "$target_cap" ]]; then
+        # Route to any town with capability
+        echo "  Required capability: $target_cap"
+        bd update "$issue_id" --add-label "requires:$target_cap" --assignee "" --status open
+        bd sync
+        echo "  ✓ Labeled with requires:$target_cap and made available"
+        echo ""
+        echo "  Any gastown with '$target_cap' capability can claim with:"
+        echo "    bd ready --unassigned --label requires:$target_cap"
+        echo "    bd update $issue_id --claim && bd sync"
+    else
+        # Just release and make available
+        bd update "$issue_id" --assignee "" --status open
+        bd sync
+        echo "  ✓ Released to pool (any gastown can claim)"
+    fi
+}
+
+# Show help
+cmd_help() {
+    cat << 'EOF'
+lirt-ambassador - Multi-gastown coordination
+
+Usage: lirt-ambassador <command> [args]
+
+Commands:
+  init [--force]
+      Initialize this gastown (ID, capabilities, sync branch)
+
+  id [get|set <id>]
+      Get or set the town identifier
+
+  caps <subcommand>
+      Manage capabilities:
+        list              Show all capabilities
+        add <cap>         Add a custom capability
+        remove <cap>      Remove a custom capability
+
+  status
+      Show current gastown status
+
+  assess <issue-id>
+      Check if this gastown can handle an issue based on
+      its requires:* labels vs local capabilities
+
+  route <issue-id> [options]
+      Route issue to appropriate gastown:
+        --to <town-id>       Route to specific gastown
+        --capability <cap>   Route to any gastown with capability
+
+  sync-setup
+      Set up or verify the beads sync branch
+
+Examples:
+  lirt-ambassador init
+  lirt-ambassador caps add gpu-access
+  lirt-ambassador assess lirt-123
+  lirt-ambassador route lirt-123 --capability darwin
+  lirt-ambassador route lirt-123 --to other-town
+
+Configuration:
+  Town config is stored in .ambassador/town.json
+  Sync branch defaults to 'beads-sync'
+EOF
+}
+
+# Main
+main() {
+    check_deps
+
+    local cmd="${1:-help}"
+    shift || true
+
+    case "$cmd" in
+        init) cmd_init "$@" ;;
+        id) cmd_id "$@" ;;
+        caps) cmd_caps "$@" ;;
+        status) cmd_status "$@" ;;
+        assess) cmd_assess "$@" ;;
+        route) cmd_route "$@" ;;
+        sync-setup) cmd_sync_setup "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)
+            echo "Unknown command: $cmd" >&2
+            echo "Run 'lirt-ambassador help' for usage" >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
