@@ -5,21 +5,21 @@
 
 ## Purpose
 
-During lirt development, agents naturally encounter testable scenarios while implementing features, writing specifications, or reviewing code. This protocol ensures those scenarios are captured for comprehensive test coverage.
+During development, agents naturally encounter testable scenarios while implementing features, writing specifications, or reviewing code. This protocol ensures those scenarios are captured for comprehensive test coverage.
 
 ## When to Create Test Beads
 
 **ALL agents** must watch for testable scenarios:
 
-### During Specification Writing (lirt-spec-writer)
-- Edge cases in command behavior
-- Error conditions in CLI usage
-- Complex flag combinations
-- Unusual input patterns
+### During Specification Writing
+- Edge cases in behavior
+- Error conditions
+- Complex input combinations
+- Unusual patterns
 - API error responses
-- Format conversions (JSON, CSV, table)
+- Format conversions
 
-### During Implementation (lirt-specialist)
+### During Implementation
 - Edge cases discovered in code
 - Error handling paths
 - Complex business logic branches
@@ -27,7 +27,7 @@ During lirt development, agents naturally encounter testable scenarios while imp
 - Concurrent operation scenarios
 - Performance-critical code paths
 
-### During Code Review (lirt-code-reviewer)
+### During Code Review
 - Untested code paths
 - Missing error handling tests
 - Security-sensitive operations without tests
@@ -47,13 +47,14 @@ bd create --title "Test: [specific scenario]" \
 ```
 
 ### Priority Guidelines
+
 - **P0**: Critical path, blocks release (authentication, data loss scenarios)
 - **P1**: Important functionality, needed for stability (error handling, edge cases)
 - **P2**: Standard tests (default for most scenarios)
 - **P3**: Nice-to-have, optimization tests
 - **P4**: Future consideration
 
-### Rich Description Template
+## Rich Description Template
 
 Your test bead description MUST include:
 
@@ -79,41 +80,40 @@ Your test bead description MUST include:
 [What makes this test complete]
 ```
 
-### Example Test Bead
+## Example Test Bead
 
 ```bash
-bd create --title "Test: issue list filter edge cases" \
+bd create --title "Test: filter edge cases" \
   --type task \
   --priority 2 \
   --add-label requires:testing \
   --description "
 ## Scenario
-The 'lirt issue list --filter' command needs comprehensive edge case testing
-for invalid filter syntax and empty result handling.
+The filter command needs comprehensive edge case testing for invalid syntax
+and empty result handling.
 
 ## Context
-Writing CLI reference documentation for issue list command. Documented the
-filter syntax (field:operator:value) but realized we haven't tested invalid
-inputs or empty results.
+Writing CLI reference documentation. Documented filter syntax but realized
+we haven't tested invalid inputs or empty results.
 
 ## Test Cases Needed
 1. Invalid syntax: --filter 'invalid' → clear error message
 2. Invalid field: --filter 'badfield:eq:foo' → 'unknown field' error
 3. Invalid operator: --filter 'title:badop:foo' → 'unknown operator' error
-4. Empty results: --filter 'title:eq:nonexistent' → empty table, not error
+4. Empty results: --filter 'title:eq:nonexistent' → empty output, not error
 5. Multiple filters: --filter 'state:eq:done' --filter 'team:eq:ENG'
 6. Conflicting filters: --filter 'state:eq:done' --filter 'state:eq:todo'
 
 ## Why This Matters
-- Filters are primary way users query issues
+- Filters are primary way users query data
 - Poor error messages frustrate users
 - Need to distinguish 'no results' from 'invalid query'
 - Multiple filters have AND semantics that must be clear
 
 ## Implementation Notes
-- Filter parsing: cmd/issue/filters.go:45-120
+- Filter parsing: cmd/filter.go:45-120
 - Use table-driven tests with subtests
-- Mock Linear API responses for each scenario
+- Mock API responses for each scenario
 - Test both table and JSON output formats
 
 ## Acceptance Criteria
@@ -126,18 +126,13 @@ inputs or empty results.
 
 ## Labels for Test Organization
 
-Add specific labels to help lirt-test-engineer prioritize:
+Add specific labels to help prioritize:
 
 ```bash
 # Type of testing
 --add-label unit-test
 --add-label integration-test
 --add-label benchmark
-
-# Component
---add-label cli
---add-label api-client
---add-label config
 
 # Urgency
 --add-label blocks-release
@@ -156,18 +151,18 @@ If you can't capture test requirements richly:
 ## Self-Check Before Creating
 
 Before creating a test bead, verify:
-- ✅ Scenario is specific and testable
-- ✅ Test cases are clearly enumerated
-- ✅ Expected behavior is defined
-- ✅ Relevant code locations referenced
-- ✅ Priority appropriate for importance
+- Scenario is specific and testable
+- Test cases are clearly enumerated
+- Expected behavior is defined
+- Relevant code locations referenced
+- Priority appropriate for importance
 
 ## Processing Test Beads
 
-The lirt-test-engineer will:
+Test engineers or developers will:
 1. Query: `bd ready --label requires:testing`
 2. Read test bead descriptions
-3. Implement tests following Go testing patterns
+3. Implement tests following project testing patterns
 4. Verify all acceptance criteria met
 5. Close bead: `bd close <id>`
 
