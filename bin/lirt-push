@@ -28,8 +28,9 @@ cd "$PROJECT_ROOT"
 
 echo "Pre-Push Chronicle Gate..."
 
-# Check for open chronicle beads
-OPEN_BEADS=$(bd ready --type chronicle 2>/dev/null | grep -v "^$" | head -20 || true)
+# Check for open chronicle beads (chronicle label on task-type issues)
+# Filter to only lines starting with status markers (○, ●, ◐, etc.) to exclude tips/warnings
+OPEN_BEADS=$(bd list --label chronicle --status open 2>/dev/null | grep -E "^[○●◐◑]" | head -20 || true)
 
 if [[ -n "$OPEN_BEADS" ]]; then
     BEAD_COUNT=$(echo "$OPEN_BEADS" | wc -l | tr -d ' ')
@@ -41,7 +42,7 @@ if [[ -n "$OPEN_BEADS" ]]; then
     echo ""
     echo "Process beads before pushing:"
     echo "  1. Run: lirt-chronicler"
-    echo "  2. Verify: bd ready --type chronicle  # Must return empty"
+    echo "  2. Verify: bd list --label chronicle --status open  # Must return empty"
     echo "  3. Then run: lirt-push"
     echo ""
     exit 1

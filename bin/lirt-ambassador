@@ -1156,7 +1156,12 @@ cmd_chronicle() {
     bd create "${bd_args[@]}"
 
     echo ""
-    echo "Run 'lirt-chronicler' to process chronicle beads into diary entries."
+    # Check if chronicler capability is present
+    if [[ -f "$PROJECT_ROOT/bin/lirt-chronicler" ]] || [[ -f "$PROJECT_ROOT/roles/chronicler.md" ]]; then
+        echo "Run 'lirt-chronicler' to process chronicle beads into diary entries."
+    else
+        echo "Chronicle bead created. Query with: bd list --label chronicle --status open"
+    fi
 }
 
 # Auto-classify domain based on keywords
@@ -1383,16 +1388,15 @@ BEAD CREATION (ENFORCED):
     --type <type>                  Bead type (default: task)
     --auto-classify                Auto-detect domain from title
 
+  chronicle --title "..." [options]  Create a chronicle bead for diary
+    --category <cat>               Chronicle category (decision/milestone/insight/issue)
+    --domain <domain>              Domain classification (default: meta)
+    --auto-classify                Auto-detect domain from title
+
   classify <issue-id> [options]    Add policy classification to existing bead
     --domain <domain>              Domain classification
     --ip <scope>                   IP scope
     --auto                         Auto-classify from title
-
-  chronicle --title "..." [opts]   Create a chronicle bead (diary-worthy moment)
-    --category <cat>               decision, insight, pattern, correction, lesson
-    --domain <domain>              Domain classification
-    --description <text>           Full description
-    --auto-classify                Auto-detect domain from title
 
 ASSESSMENT & ROUTING:
   assess <issue-id> [--verbose]    Check if this gastown can handle an issue

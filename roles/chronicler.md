@@ -49,29 +49,28 @@ When you identify something chronicle-worthy, create a chronicle bead **IMMEDIAT
 
 ```bash
 bd create --title "Chronicle: [specific topic]" \
-  --type chronicle \
+  --type task \
   --priority 3 \
-  --add-label [category] \
+  --labels "chronicle,[category]" \
   --description "[See template below]"
 ```
 
 ### Category Labels
 
-Add labels to help organize entries:
+Include category in the labels (comma-separated):
 
 ```bash
---add-label decision       # Architectural or design decision
---add-label insight        # Realization that changed understanding
---add-label pattern        # Recurring theme recognized
---add-label correction     # Direction change
---add-label lesson         # What worked/didn't work
+--labels "chronicle,decision"      # Architectural or design decision
+--labels "chronicle,insight"       # Realization that changed understanding
+--labels "chronicle,pattern"       # Recurring theme recognized
+--labels "chronicle,correction"    # Direction change
+--labels "chronicle,lesson"        # What worked/didn't work
 
---add-label architecture   # System architecture
---add-label api            # API design/integration
---add-label cli-ux         # CLI user experience
---add-label performance    # Performance optimization
---add-label testing        # Testing strategies
---add-label security       # Security decisions
+# Add topic labels as needed:
+--labels "chronicle,decision,architecture"   # System architecture decision
+--labels "chronicle,insight,api"             # API integration insight
+--labels "chronicle,lesson,cli-ux"           # CLI user experience lesson
+--labels "chronicle,pattern,testing"         # Testing pattern recognized
 ```
 
 ### Priority Guidelines
@@ -129,10 +128,9 @@ This ensures the chronicler can write comprehensive diary entries without losing
 
 ```bash
 bd create --title "Chronicle: Functional options for client configuration" \
-  --type chronicle \
+  --type task \
   --priority 3 \
-  --add-label decision \
-  --add-label architecture \
+  --labels "chronicle,decision,architecture" \
   --description "
 Type: decision
 
@@ -184,10 +182,9 @@ Implications:
 
 ```bash
 bd create --title "Chronicle: Cursor pagination advantages" \
-  --type chronicle \
+  --type task \
   --priority 3 \
-  --add-label insight \
-  --add-label api \
+  --labels "chronicle,insight,api" \
   --description "
 Type: insight
 
@@ -256,7 +253,7 @@ If any answer is NO → Add more detail before creating the bead
 ## Processing Chronicle Beads
 
 The lirt-chronicler agent will:
-1. Query: `bd ready --type chronicle`
+1. Query: `bd list --label chronicle --status open`
 2. Read all open chronicle beads
 3. Attempt to group related beads (same session, related topics)
 4. Create diary entries (one per bead, or grouped if appropriate)
