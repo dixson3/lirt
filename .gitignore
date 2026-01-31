@@ -1,3 +1,14 @@
+# Gas Town catalog items (managed at rig level, not in repo)
+roles/ambassador.md
+roles/chronicler.md
+roles/code-quality-reporter.md
+roles/test-case-identifier.md
+.claude/agents/chronicler.md
+.claude/settings.json
+
+# Catalog scripts (note: bin/ already gitignored below for Go builds)
+# bin/lirt-ambassador, bin/lirt-chronicler, etc. covered by bin/
+
 # lirt runtime configuration (town-specific)
 .lirt/
 
